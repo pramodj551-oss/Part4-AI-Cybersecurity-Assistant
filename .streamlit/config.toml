@@ -1,0 +1,41 @@
+# ==========================================================
+# AI-Powered Cybersecurity Incident Assistant
+# Streamlit Configuration
+# Version: 4.0
+# ==========================================================
+
+[theme]
+
+primaryColor = "#0F62FE"
+
+backgroundColor = "#FFFFFF"
+
+secondaryBackgroundColor = "#F5F7FA"
+
+textColor = "#1F2937"
+
+font = "sans serif"
+
+
+[server]
+
+headless = true
+
+runOnSave = true
+
+enableStaticServing = true
+
+
+[browser]
+
+gatherUsageStats = false
+
+
+[client]
+
+toolbarMode = "minimal"
+
+
+[runner]
+
+fastReruns = true
