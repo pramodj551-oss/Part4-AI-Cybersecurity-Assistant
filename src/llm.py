@@ -1,14 +1,4 @@
-"""
-==========================================================
-AI-Powered Cybersecurity Incident Assistant (RAG)
-LLM Module
-Version: 4.0
-==========================================================
-
-OpenAI-compatible LLM client.
-Supports providers such as OpenAI, Groq and other
-OpenAI-compatible APIs.
-"""
+"""OpenAI-compatible LLM client used by the RAG pipeline."""
 
 from __future__ import annotations
 
@@ -16,95 +6,48 @@ import logging
 
 from openai import OpenAI
 
-from config.config import (
-    API_BASE_URL,
-    API_KEY,
-    LLM_MODEL,
-    MAX_TOKENS,
-    TEMPERATURE
-)
+from config.config import API_BASE_URL, API_KEY, LLM_MODEL, MAX_TOKENS, TEMPERATURE
 
 logger = logging.getLogger(__name__)
 
 
 class LLMManager:
-    """
-    Wrapper around an OpenAI-compatible client.
-    """
+    """Wrapper around an OpenAI-compatible LLM endpoint."""
 
     def __init__(self):
-
         self.client = OpenAI(
             api_key=API_KEY,
-            base_url=API_BASE_URL or None
+            base_url=API_BASE_URL,
         )
 
-    def generate(
-        self,
-        prompt: str
-    ) -> dict:
-        """
-        Generate an LLM response.
-        """
+    def generate(self, prompt: str, system_prompt: str | None = None) -> dict:
+        if not prompt.strip():
+            raise ValueError("Prompt cannot be empty.")
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         try:
-
             response = self.client.chat.completions.create(
-
                 model=LLM_MODEL,
-
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-
+                messages=messages,
                 temperature=TEMPERATURE,
-
-                max_tokens=MAX_TOKENS
+                max_tokens=MAX_TOKENS,
             )
-
-            answer = (
-                response
-                .choices[0]
-                .message
-                .content
-                .strip()
-            )
-
-            logger.info(
-                "LLM response generated."
-            )
-
+            content = response.choices[0].message.content or ""
             return {
-
-                "answer": answer,
-
+                "answer": content.strip(),
                 "model": LLM_MODEL,
-
-                "finish_reason":
-                response.choices[0].finish_reason
-
+                "finish_reason": response.choices[0].finish_reason,
             }
-
-        except Exception as error:
-
-            logger.exception(
-                "LLM request failed."
-            )
-
+        except Exception:
+            logger.exception("LLM request failed.")
             return {
-
-                "answer":
-                "Unable to generate a response.",
-
+                "answer": "Unable to generate a response. Please verify the LLM service configuration.",
                 "model": LLM_MODEL,
-
                 "finish_reason": "error",
-
-                "error": str(error)
-
             }
 
 

@@ -1,0 +1,49 @@
+name: Validate Transformers 5.15.1 Candidate
+
+on:
+  push:
+    branches: ["validation/transformers-5.15.1"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-validation-5.15.1.txt
+
+      - name: Install candidate and audit tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-validation-5.15.1.txt
+          python -m pip install pip-audit pipdeptree
+
+      - name: Resolver and environment consistency
+        run: |
+          python -m pip check
+          python -m pip freeze --all | tee /tmp/pip-freeze.txt
+          python -m pip inspect --local > /tmp/pip-inspect.json
+          python -m pipdeptree --warn fail > /tmp/pipdeptree.txt
+
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit --local --format columns
+
+      - name: Publish exact resolved graph
+        uses: actions/upload-artifact@v4
+        with:
+          name: transformers-5.15.1-resolved-graph
+          path: |
+            /tmp/pip-freeze.txt
+            /tmp/pip-inspect.json
+            /tmp/pipdeptree.txt
