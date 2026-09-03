@@ -16,3 +16,4 @@ plotly==6.0.0
 joblib==1.4.2
 tqdm==4.67.1
 pypdf==6.16.1
+setuptools>=83.0.0
