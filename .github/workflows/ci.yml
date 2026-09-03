@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install runtime and test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+
+      - name: Compile Python files
+        run: python -m compileall -q app.py config src pages tests
+
+      - name: Lint
+        run: ruff check app.py config src pages tests
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit -r requirements.txt
+
+      - name: Reproducible dependency resolution check
+        run: pip-compile --quiet --generate-hashes --output-file=/tmp/requirements.lock requirements.in
