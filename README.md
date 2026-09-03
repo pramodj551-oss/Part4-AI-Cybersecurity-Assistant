@@ -1,235 +1,86 @@
 # 🛡️ AI-Powered Cybersecurity Incident Assistant (RAG)
 
-**Part 4 – End-to-End Applied AI & ML Capstone Project**
+Part 4 – End-to-End Applied AI & ML Capstone Project.
 
-An intelligent Retrieval-Augmented Generation (RAG) assistant that helps cybersecurity analysts search incidents, retrieve Standard Operating Procedures (SOPs), answer security-related questions, and provide context-aware responses using a locally-hosted Large Language Model (via Ollama) and a FAISS vector database.
+A Streamlit Retrieval-Augmented Generation assistant for cybersecurity incident investigation. The application retrieves trusted local knowledge, builds a security-aware prompt, and uses a local Ollama model through its OpenAI-compatible API.
 
----
-
-## 📌 Project Overview
-
-The AI-Powered Cybersecurity Incident Assistant combines Machine Learning, Retrieval-Augmented Generation (RAG), vector search, and Large Language Models to help Security Operations Center (SOC) analysts investigate incidents faster and more accurately.
-
-Rather than relying solely on the LLM's internal knowledge, the assistant retrieves relevant information from a cybersecurity knowledge base — incident history, SOPs, and FAQs — before generating a response. This grounds every answer in your organization's own documentation, reducing hallucinations and improving answer relevance.
-
----
-
-## 🎯 Project Objectives
-
-- Build an end-to-end RAG pipeline
-- Retrieve relevant cybersecurity knowledge
-- Answer SOC analyst questions
-- Recommend Standard Operating Procedures (SOPs)
-- Search historical incidents
-- Reduce LLM hallucinations
-- Provide source-aware responses
-- Deliver an interactive Streamlit chatbot
-
----
-
-## 🚀 Key Features
-
-- AI-powered cybersecurity assistant
-- Retrieval-Augmented Generation (RAG)
-- Vector similarity search (FAISS)
-- Knowledge base search
-- SOP retrieval
-- Incident search
-- Interactive Streamlit chat interface
-- Conversation history
-- Modular, extensible architecture
-- Runs entirely locally via Ollama — no data leaves your machine
-
----
-
-## 🏗️ Architecture
+## Current architecture
 
 ```text
-User Question
-      │
-      ▼
-Streamlit Chat Interface
-      │
-      ▼
-Retriever
-      │
-      ▼
-Vector Database (FAISS)
-      │
-      ▼
-Relevant Documents
-      │
-      ▼
+Streamlit Chat
+    ↓
+Retriever → FAISS
+    ↓
+Retrieved documents (untrusted data)
+    ↓
 Prompt Builder
-      │
-      ▼
-Large Language Model (Ollama)
-      │
-      ▼
-AI Response + Sources
+    ↓
+LLMManager → Ollama / OpenAI-compatible API
+    ↓
+Answer + source names
 ```
 
----
+Retrieved documents are treated as data, not instructions. Persisted FAISS metadata is loaded only after an externally supplied SHA-256 integrity check.
 
-## 📁 Project Structure
+## Repository layout
 
 ```text
-Part4-AI-Cybersecurity-Assistant/
-│
-├── app.py
-├── requirements.txt
-├── README.md
-├── LICENSE
-├── CHANGELOG.md
-├── .gitignore
-│
-├── config/
-│   └── config.py
-│
-├── data/
-│   ├── cybersecurity_incidents.csv
-│   ├── faq.csv
-│   ├── sop_documents/
-│   └── knowledge_base/
-│
-├── prompts/
-│   └── system_prompt.txt
-│
-├── vectorstore/
-│
-├── models/
-│
-├── src/
-│   ├── data_loader.py
-│   ├── document_loader.py
-│   ├── text_splitter.py
-│   ├── embeddings.py
-│   ├── vector_store.py
-│   ├── retriever.py
-│   ├── llm.py
-│   ├── rag_pipeline.py
-│   ├── response_generator.py
-│   └── utils.py
-│
-├── pages/
-│   ├── Chat.py
-│   ├── Knowledge_Base.py
-│   ├── Incident_Search.py
-│   └── Settings.py
-│
-├── assets/
-└── logs/
+app.py
+config/config.py
+data/cybersecurity_incident_reports.csv
+pages/Chat.py
+pages/Incident_Search.py
+pages/Knowledge_Base.py
+pages/Settings.py
+src/{data_loader,document_loader,embeddings,llm,prompt_builder,rag_pipeline,response_generator,retriever,text_splitter,utils,vector_store}.py
+.github/workflows/{ci,dependency-review,python-publish}.yml
 ```
 
----
+## Setup
 
-## 🛠️ Technology Stack
-
-- Python 3.10+
-- Streamlit
-- LangChain
-- FAISS
-- Hugging Face Sentence Transformers (embeddings)
-- Ollama (local LLM serving, via OpenAI-compatible API)
-- Pandas / NumPy
-- Scikit-learn
-- Plotly
-- Joblib
-
----
-
-## ▶️ Getting Started
-
-### 1. Clone the repository
+Python 3.11 is the CI baseline.
 
 ```bash
-git clone https://github.com/<your-username>/Part4-AI-Cybersecurity-Assistant.git
-cd Part4-AI-Cybersecurity-Assistant
-```
-
-### 2. Install dependencies
-
-```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
-### 3. Set up Ollama
-
-This project uses [Ollama](https://ollama.com) to serve the LLM locally.
+Install and start Ollama separately, then make sure the model in `LLM_MODEL` exists locally. The default is `llama2`.
 
 ```bash
-ollama pull <your-model-name>
+ollama pull llama2
 ollama serve
-```
-
-Make sure `LLM_MODEL` in `config/config.py` exactly matches the model name shown by `ollama list`, and that `API_BASE_URL` points at your local Ollama server's OpenAI-compatible endpoint.
-
-### 4. Build the knowledge base
-
-On first run, the app loads documents from `data/`, chunks them, generates embeddings, and builds the FAISS index. This step requires internet access the first time, to download the embedding model.
-
-### 5. Run the application
-
-```bash
 streamlit run app.py
 ```
 
----
+The authoritative incident dataset is `data/cybersecurity_incident_reports.csv`.
 
-## 📌 Project Workflow
+## Persisted FAISS index security
 
-1. Load cybersecurity knowledge base (incidents, SOPs, FAQs)
-2. Split documents into chunks
-3. Generate embeddings
-4. Build FAISS vector index
-5. Retrieve relevant documents for a query
-6. Build a contextual prompt
-7. Generate an AI response via the local LLM
-8. Display the answer alongside its retrieved sources
+LangChain's local FAISS loader uses pickle for metadata. This project therefore refuses to load a persisted index unless `FAISS_INDEX_PKL_SHA256` exactly matches the SHA-256 of `vectorstore/faiss_index/index.pkl`.
 
----
+After creating or receiving a trusted index, calculate its hash and set the environment variable before starting the application. Never accept a hash supplied by an untrusted source.
 
-## 🧭 Project Status
+## Development and CI
 
-This is an actively developed capstone project. The core RAG pipeline (retrieval → prompting → generation) is functional end-to-end. Known areas still being hardened:
+Runtime dependencies are in `requirements.txt`; developer/CI-only tools are in `requirements-dev.txt`. `requirements.in` records the production dependency inputs. CI performs Python compilation, Ruff linting, pytest tests, pip-audit vulnerability checks, and a hashed pip-tools resolution check.
 
-- Error handling for missing/uninitialized vector index
-- Graceful fallback when retrieval returns no relevant documents
-- Consistent success/error response schema across the pipeline
-- Live system health checks (LLM reachability, index status) on the home page
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+ruff check app.py config src pages tests
+```
 
-See `CHANGELOG.md` for details as these are addressed.
+## Important scope
 
----
+The repository currently contains the application and incident CSV. External Part 1/2/3 repositories, generated model artifacts, and a persisted vector index are not assumed to exist in a fresh clone. Integration synchronization is therefore treated as an explicit deployment step rather than a hidden application dependency.
 
-## 🔮 Future Enhancements
+## License
 
-- Hybrid search (keyword + vector)
-- Multi-document RAG
-- Conversation memory
-- Explainable AI
-- Authentication
-- Docker support
-- REST API
-- Cloud deployment
-- Model monitoring
-- Multi-LLM provider support
+MIT License.
 
----
+## Author
 
-## 📄 License
-
-This project is licensed under the MIT License.
-
----
-
-## 👨‍💻 Author
-
-**Pramod Prakash Jadhav**
-AI/ML Developer | SOC & Cybersecurity Professional
-
----
-
-## ⭐ Version
-
-Version 4.0
+Pramod Prakash Jadhav
