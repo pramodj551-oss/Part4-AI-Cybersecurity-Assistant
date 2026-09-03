@@ -1,167 +1,63 @@
-"""
-==========================================================
-AI-Powered Cybersecurity Incident Assistant (RAG)
-Home Page
-Version: 4.0
-==========================================================
-"""
-
-from __future__ import annotations
+"""Interactive cybersecurity RAG chat page."""
 
 import streamlit as st
 
-from config.config import (
-    APP_ICON,
-    APP_TITLE
-)
-
-
-# ----------------------------------------------------------
-# Page Configuration
-# ----------------------------------------------------------
+from config.config import APP_ICON, APP_TITLE
+from src.rag_pipeline import rag_pipeline
 
 st.set_page_config(
-    page_title=APP_TITLE,
+    page_title="Chat",
     page_icon=APP_ICON,
     layout="wide",
-    initial_sidebar_state="expanded"
 )
 
-# ----------------------------------------------------------
-# Session State
-# ----------------------------------------------------------
+st.title("💬 Cybersecurity AI Assistant")
+st.caption("Answers are grounded in retrieved cybersecurity knowledge. Untrusted document text is never treated as an instruction.")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# ----------------------------------------------------------
-# Sidebar
-# ----------------------------------------------------------
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
 
 with st.sidebar:
+    st.header("AI Cybersecurity Assistant")
+    st.success("Ready")
+    if st.button("Clear conversation", use_container_width=True):
+        st.session_state.chat_messages = []
+        st.rerun()
 
-    st.title("🛡️ AI Cybersecurity Assistant")
+for message in st.session_state.chat_messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        if message.get("sources"):
+            with st.expander("Sources"):
+                for source in message["sources"]:
+                    st.write(f"- {source}")
 
-    st.markdown("---")
+question = st.chat_input("Ask a cybersecurity question...")
 
-    st.success("System Status: Online")
+if question:
+    st.session_state.chat_messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
 
-    st.markdown(
-        """
-### Navigation
+    with st.chat_message("assistant"):
+        with st.spinner("Retrieving relevant context and generating response..."):
+            try:
+                result = rag_pipeline.answer(question)
+                answer = result.get("answer") or "No answer was generated."
+                sources = result.get("sources", [])
+            except (ValueError, FileNotFoundError, RuntimeError) as error:
+                answer = f"The assistant is not ready: {error}"
+                sources = []
+            except Exception:
+                answer = "The assistant could not complete the request. Check the application logs for details."
+                sources = []
 
-Use the pages in the sidebar:
+        st.markdown(answer)
+        if sources:
+            with st.expander("Sources"):
+                for source in sources:
+                    st.write(f"- {source}")
 
-- 💬 Chat
-- 📚 Knowledge Base
-- 🔍 Incident Search
-- ⚙️ Settings
-"""
+    st.session_state.chat_messages.append(
+        {"role": "assistant", "content": answer, "sources": sources}
     )
-
-    st.markdown("---")
-
-    if st.button("🗑 Clear Chat History"):
-
-        st.session_state.chat_history = []
-        st.session_state.messages = []
-
-        st.success("Chat history cleared.")
-
-# ----------------------------------------------------------
-# Main Page
-# ----------------------------------------------------------
-
-st.title(APP_TITLE)
-
-st.caption(
-    "Retrieval-Augmented Generation (RAG) for Cybersecurity Incident Response"
-)
-
-st.markdown("---")
-
-st.header("🎯 Project Overview")
-
-st.write(
-    """
-This application helps Security Operations Center (SOC) analysts
-retrieve cybersecurity knowledge, search incidents,
-and receive context-aware AI responses using
-Retrieval-Augmented Generation (RAG).
-"""
-)
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    st.subheader("✨ Features")
-
-    st.markdown(
-        """
-- AI-powered cybersecurity assistant
-
-- RAG-based document retrieval
-
-- FAISS vector search
-
-- Incident search
-
-- SOP retrieval
-
-- Knowledge base browser
-
-- Multi-page Streamlit application
-"""
-    )
-
-with col2:
-
-    st.subheader("🛠 Technology Stack")
-
-    st.markdown(
-        """
-- Python
-
-- Streamlit
-
-- LangChain
-
-- FAISS
-
-- Hugging Face Embeddings
-
-- OpenAI-compatible APIs
-
-- Pandas
-
-- NumPy
-"""
-    )
-
-st.markdown("---")
-
-st.subheader("🚀 Quick Start")
-
-st.info(
-    """
-1. Open **💬 Chat** to ask cybersecurity questions.
-
-2. Browse documents in **📚 Knowledge Base**.
-
-3. Search historical incidents in **🔍 Incident Search**.
-
-4. Configure the application from **⚙️ Settings**.
-"""
-)
-
-st.markdown("---")
-
-st.success(
-    "✅ AI-Powered Cybersecurity Incident Assistant is ready."
-)
-
-st.caption("Version 4.0")
