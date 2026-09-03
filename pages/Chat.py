@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from config.config import APP_ICON, APP_TITLE
+from config.config import APP_ICON
 from src.rag_pipeline import rag_pipeline
 
 st.set_page_config(
