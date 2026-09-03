@@ -1,161 +1,58 @@
-"""
-==========================================================
-AI-Powered Cybersecurity Incident Assistant (RAG)
-Incident Search Page
-Version: 4.0
-==========================================================
-"""
-
-from __future__ import annotations
+"""Incident search page."""
 
 import streamlit as st
 
-from config.config import INCIDENT_DATASET
+from config.config import APP_ICON, APP_TITLE, INCIDENT_DATASET
 from src.data_loader import data_loader
-
 
 st.set_page_config(
     page_title="Incident Search",
-    page_icon="🔍",
-    layout="wide"
+    page_icon="🔎",
+    layout="wide",
 )
 
-st.title("🔍 Cybersecurity Incident Search")
-
-st.caption(
-    "Search historical cybersecurity incidents."
-)
-
-# ----------------------------------------------------------
-# Load Dataset
-# ----------------------------------------------------------
+st.title("🔎 Incident Search")
+st.caption("Search the authoritative cybersecurity incident dataset.")
 
 try:
-
-    incidents = data_loader.load_csv(
-        INCIDENT_DATASET
-    )
-
-except Exception as error:
-
-    st.error(
-        f"Unable to load dataset.\n\n{error}"
-    )
-
+    incidents = data_loader.load_csv(INCIDENT_DATASET)
+    data_loader.validate(incidents)
+except (FileNotFoundError, ValueError) as error:
+    st.error(f"Incident dataset is unavailable: {error}")
     st.stop()
 
-# ----------------------------------------------------------
-# Sidebar Filters
-# ----------------------------------------------------------
+query = st.text_input("Search incidents", placeholder="keyword, IP, category, description...")
+severity = st.selectbox("Severity", ["All", "Low", "Medium", "High", "Critical"])
 
-st.sidebar.header("Search Filters")
+filtered = incidents
 
-query = st.sidebar.text_input(
-    "Keyword"
+if query.strip():
+    query = query.strip()
+    mask = filtered.astype(str).apply(
+        lambda column: column.str.contains(query, case=False, na=False, regex=False)
+    ).any(axis=1)
+    filtered = filtered.loc[mask]
+
+severity_column = next(
+    (column for column in filtered.columns if column.lower() == "severity"),
+    None,
 )
 
-severity_column = None
-
-for column in incidents.columns:
-
-    if column.lower() == "severity":
-
-        severity_column = column
-        break
-
-if severity_column:
-
-    severities = sorted(
-        incidents[severity_column]
-        .dropna()
-        .astype(str)
-        .unique()
-    )
-
-    selected_severity = st.sidebar.selectbox(
-        "Severity",
-        ["All"] + severities
-    )
-
-else:
-
-    selected_severity = "All"
-
-# ----------------------------------------------------------
-# Filtering
-# ----------------------------------------------------------
-
-filtered = incidents.copy()
-
-if query:
-
-    mask = filtered.astype(str).apply(
-        lambda column:
-        column.str.contains(
-            query,
-            case=False,
-            na=False
-        )
-    ).any(axis=1)
-
-    filtered = filtered[mask]
-
-if (
-    severity_column
-    and selected_severity != "All"
-):
-
-    filtered = filtered[
-        filtered[severity_column]
-        .astype(str)
-        == selected_severity
+if severity != "All" and severity_column:
+    filtered = filtered.loc[
+        filtered[severity_column].astype(str).str.casefold() == severity.casefold()
     ]
 
-# ----------------------------------------------------------
-# Results
-# ----------------------------------------------------------
-
-st.metric(
-    "Matching Incidents",
-    len(filtered)
-)
-
-st.dataframe(
-    filtered,
-    use_container_width=True,
-    hide_index=True
-)
-
-# ----------------------------------------------------------
-# Download
-# ----------------------------------------------------------
-
-csv_data = filtered.to_csv(
-    index=False
-)
+st.metric("Matching Incidents", len(filtered))
+st.dataframe(filtered, use_container_width=True, hide_index=True)
 
 st.download_button(
-
-    label="⬇ Download Results",
-
-    data=csv_data,
-
+    "Download Results",
+    data=filtered.to_csv(index=False).encode("utf-8"),
     file_name="incident_search_results.csv",
-
-    mime="text/csv"
-
+    mime="text/csv",
 )
 
-# ----------------------------------------------------------
-# Dataset Summary
-# ----------------------------------------------------------
-
-with st.expander(
-    "Dataset Summary"
-):
-
-    summary = data_loader.dataset_summary(
-        incidents
-    )
-
-    st.json(summary)
+st.sidebar.info(f"Dataset: {INCIDENT_DATASET.name}")
+st.sidebar.caption(APP_TITLE)
+st.sidebar.caption(f"{APP_ICON} Incident Search")
