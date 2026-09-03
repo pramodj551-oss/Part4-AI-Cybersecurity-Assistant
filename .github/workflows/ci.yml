@@ -34,7 +34,7 @@ jobs:
         run: ruff check app.py config src pages tests
 
       - name: Tests
-        run: pytest -q
+        run: PYTHONPATH=. pytest -q
 
       - name: Dependency vulnerability audit
         run: python -m pip_audit -r requirements.txt
