@@ -1,5 +1,7 @@
 name: CI
 
+# Fresh verification trigger after authoritative requirements.txt publication.
+
 on:
   push:
     branches: [main, "feature/**"]
