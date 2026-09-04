@@ -16,3 +16,5 @@ plotly
 joblib
 tqdm
 pypdf
+networkx==3.4.2
+setuptools==84.0.0
