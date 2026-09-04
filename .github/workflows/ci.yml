@@ -26,8 +26,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - name: Install runtime and test dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+      - name: Install production dependencies from authoritative lock
+        run: python -m pip install --upgrade pip && python -m pip install --require-hashes -r requirements.txt
+
+      - name: Install developer and CI dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Dependency environment consistency
+        run: python -m pip check
 
       - name: Compile Python files
         run: python -m compileall -q app.py config src pages tests
