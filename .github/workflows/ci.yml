@@ -42,6 +42,13 @@ jobs:
       - name: Reproducible dependency resolution check
         run: pip-compile --quiet --generate-hashes --output-file=/tmp/requirements.lock requirements.in
 
+      - name: Publish generated authoritative lock candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: authoritative-requirements-lock
+          path: /tmp/requirements.lock
+          if-no-files-found: error
+
   candidate-transformers-5-15-1:
     runs-on: ubuntu-latest
     timeout-minutes: 20
