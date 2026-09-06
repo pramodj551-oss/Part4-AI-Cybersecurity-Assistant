@@ -4,7 +4,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "feature/**", "tmp/**"]
   pull_request:
     branches: [main]
 
@@ -48,7 +48,7 @@ jobs:
         run: python -m pip_audit -r requirements.txt
 
       - name: Reproducible dependency resolution check
-        run: pip-compile --quiet --generate-hashes --output-file=/tmp/requirements.lock requirements.in
+        run: pip-compile --quiet --allow-unsafe --generate-hashes --output-file=/tmp/requirements.lock requirements.in
 
       - name: Publish generated authoritative lock candidate
         uses: actions/upload-artifact@v4
