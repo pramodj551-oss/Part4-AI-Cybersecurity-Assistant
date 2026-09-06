@@ -22,12 +22,16 @@ from config.config import (
     TEMPERATURE,
     MAX_TOKENS
 )
+from src.auth import render_logout, require_auth
 
 st.set_page_config(
     page_title="Settings",
     page_icon="⚙️",
     layout="wide"
 )
+
+require_auth()
+render_logout()
 
 st.title("⚙️ Application Settings")
 
