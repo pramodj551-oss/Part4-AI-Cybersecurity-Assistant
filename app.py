@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from config.config import (
-    APP_ICON,
-    APP_TITLE
-)
+from config.config import APP_ICON, APP_TITLE
+from src.auth import render_logout, require_auth
 
 
 # ----------------------------------------------------------
@@ -26,6 +24,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+require_auth()
+render_logout()
 
 # ----------------------------------------------------------
 # Session State
