@@ -3,7 +3,7 @@
 import streamlit as st
 
 from config.config import APP_ICON
-from src.auth import render_logout, require_auth
+# from src.auth import render_logout, require_auth
 from src.rag_pipeline import rag_pipeline
 
 st.set_page_config(
@@ -12,8 +12,8 @@ st.set_page_config(
     layout="wide",
 )
 
-require_auth()
-render_logout()
+# require_auth()
+# render_logout()
 
 st.title("💬 Cybersecurity AI Assistant")
 st.caption("Answers are grounded in retrieved cybersecurity knowledge. Untrusted document text is never treated as an instruction.")
