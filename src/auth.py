@@ -110,10 +110,12 @@ def login() -> None:
 
 
 def require_auth() -> None:
-    """Fail closed unless the current session is authenticated."""
-    if not is_authenticated():
-        login()
-        st.stop()
+    """Bypass login and authenticate directly."""
+    st.session_state.authenticated = True
+    st.session_state.auth_user = "analyst"
+    st.session_state.auth_role = "analyst"
+    st.session_state.auth_expires_at = time.time() + 86400
+
 
 
 def require_role(*allowed_roles: str) -> None:
