@@ -7,8 +7,8 @@ import os
 
 
 def main() -> None:
-    password = getpass.getpass("Password:Swami883@")
-    confirmation = getpass.getpass("Confirm password:Swami883@")
+    password = getpass.getpass("Password: ")
+    confirmation = getpass.getpass("Confirm password: ")
     if not password or password != confirmation:
         raise SystemExit("Passwords must be non-empty and match.")
 
