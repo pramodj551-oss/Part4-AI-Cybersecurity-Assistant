@@ -7,6 +7,8 @@ import os
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from src.startup import check_startup
+
 
 def _streamlit_health(port: int) -> bool:
     """Return True only when Streamlit's native health endpoint is healthy."""
@@ -28,8 +30,6 @@ def check_readiness(port: int = 8502) -> bool:
         return False
 
     try:
-        from src.startup import check_startup
-
         if not check_startup():
             return False
     except Exception:
