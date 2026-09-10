@@ -3,7 +3,7 @@
 import streamlit as st
 
 from config.config import APP_ICON, APP_TITLE, INCIDENT_DATASET
-# from src.auth import render_logout, require_auth
+from src.auth import render_logout, require_auth
 from src.data_loader import data_loader
 
 st.set_page_config(
@@ -12,8 +12,8 @@ st.set_page_config(
     layout="wide",
 )
 
-# require_auth()
-# render_logout()
+require_auth()
+render_logout()
 
 st.title("🔎 Incident Search")
 st.caption("Search the authoritative cybersecurity incident dataset.")
