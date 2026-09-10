@@ -10,6 +10,7 @@ import pytest
 
 from src.integration_contract import (
     EXPECTED_ARTIFACTS,
+    IntegrationContractError,
     validate_artifacts_against_manifest,
     validate_handoff_manifest,
 )
@@ -130,7 +131,8 @@ def test_required_runtime_artifacts_fail_closed_when_missing(tmp_path: Path) -> 
     manifest = _manifest()
     _write_artifacts(tmp_path, manifest)
     (tmp_path / EXPECTED_ARTIFACTS[0]).unlink()
-    assert not validate_artifacts_against_manifest(tmp_path, manifest)
+    with pytest.raises(IntegrationContractError, match="artifact missing or empty"):
+        validate_artifacts_against_manifest(tmp_path, manifest)
 
 
 def test_required_runtime_artifacts_fail_closed_when_tampered(tmp_path: Path) -> None:
@@ -138,7 +140,8 @@ def test_required_runtime_artifacts_fail_closed_when_tampered(tmp_path: Path) ->
     _write_artifacts(tmp_path, manifest)
     target = tmp_path / EXPECTED_ARTIFACTS[1]
     target.write_text("tampered", encoding="utf-8")
-    assert not validate_artifacts_against_manifest(tmp_path, manifest)
+    with pytest.raises(IntegrationContractError, match="checksum mismatch"):
+        validate_artifacts_against_manifest(tmp_path, manifest)
 
 
 def test_scorecard_is_serializable() -> None:
