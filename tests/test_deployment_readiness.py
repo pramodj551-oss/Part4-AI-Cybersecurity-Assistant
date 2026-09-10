@@ -40,7 +40,9 @@ def test_readiness_fails_when_streamlit_is_unavailable():
 
 def test_production_readiness_validates_configuration():
     _production_config_import.validate_called = False
-    with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch.dict(
+    with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch(
+        "scripts.healthcheck.check_startup", return_value=True
+    ), patch.dict(
         "os.environ", {"APP_ENVIRONMENT": "production"}, clear=False
     ), patch("builtins.__import__", side_effect=_production_config_import):
         assert healthcheck.check_readiness(8502) is True
@@ -48,7 +50,7 @@ def test_production_readiness_validates_configuration():
 
 
 def test_non_production_readiness_does_not_require_production_config():
-    with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch.dict(
+    with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch(
         "os.environ", {"APP_ENVIRONMENT": "development"}, clear=False
     ):
         assert healthcheck.check_readiness(8502) is True
