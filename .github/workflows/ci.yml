@@ -27,9 +27,9 @@ jobs:
       - name: Dependency environment consistency
         run: python -m pip check
       - name: Compile Python files
-        run: python -m compileall -q app.py config src pages tests
+        run: python -m compileall -q app.py config src pages tests scripts
       - name: Lint
-        run: ruff check app.py config src pages tests
+        run: ruff check app.py config src pages tests scripts
       - name: Tests
         run: PYTHONPATH=. pytest -q
       - name: Dependency vulnerability audit
@@ -117,6 +117,31 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: LLM-RES-01 mandatory gate
         run: PYTHONPATH=. pytest -q tests/test_llm_resilience.py
+  deploy-readiness:
+    name: DEPLOY-HEALTH-01 deployment and health readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install production dependencies from authoritative lock
+        run: python -m pip install --require-hashes -r requirements.txt
+      - name: Install test runner
+        run: python -m pip install -r requirements-dev.txt
+      - name: DEPLOY-HEALTH-01 mandatory gate
+        run: PYTHONPATH=. pytest -q tests/test_deployment_readiness.py
+      - name: Validate Dockerfile syntax and deployment contract
+        run: |
+          test -f Dockerfile
+          grep -q 'HEALTHCHECK' Dockerfile
+          grep -q 'USER app' Dockerfile
+          grep -q 'EXPOSE 8502' Dockerfile
   python-compatibility:
     name: Python compatibility (${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -143,7 +168,7 @@ jobs:
       - name: Dependency environment consistency
         run: python -m pip check
       - name: Compile Python files
-        run: python -m compileall -q app.py config src pages tests
+        run: python -m compileall -q app.py config src pages tests scripts
       - name: Tests
         run: PYTHONPATH=. pytest -q
       - name: Dependency vulnerability audit
