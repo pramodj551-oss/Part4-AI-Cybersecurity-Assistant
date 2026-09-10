@@ -1,16 +1,17 @@
-"""Container health/readiness checks for the Streamlit application."""
+"""Container health and readiness checks for the Streamlit service."""
 
 from __future__ import annotations
 
 import argparse
 import os
-import sys
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from src.startup import check_startup
+
 
 def _streamlit_health(port: int) -> bool:
-    """Return True when Streamlit's native health endpoint responds successfully."""
+    """Return True only when Streamlit's native health endpoint is healthy."""
     try:
         with urlopen(f"http://127.0.0.1:{port}/_stcore/health", timeout=3) as response:
             return response.status == 200
@@ -18,13 +19,20 @@ def _streamlit_health(port: int) -> bool:
         return False
 
 
-def check_health(port: int) -> bool:
+def check_health(port: int = 8502) -> bool:
+    """Check the application's serving process."""
     return _streamlit_health(port)
 
 
-def check_readiness(port: int) -> bool:
-    """Check serving health and fail closed for invalid production configuration."""
-    if not _streamlit_health(port):
+def check_readiness(port: int = 8502) -> bool:
+    """Check serving health plus required startup dependencies/configuration."""
+    if not check_health(port):
+        return False
+
+    try:
+        if not check_startup():
+            return False
+    except Exception:
         return False
 
     if os.getenv("APP_ENVIRONMENT", "development").strip().lower() in {"production", "prod"}:
@@ -34,14 +42,15 @@ def check_readiness(port: int) -> bool:
             validate_production_config()
         except Exception:
             return False
+
     return True
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--health", action="store_true")
-    group.add_argument("--ready", action="store_true")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--health", action="store_true")
+    mode.add_argument("--ready", action="store_true")
     parser.add_argument("--port", type=int, default=8502)
     args = parser.parse_args()
 
@@ -50,4 +59,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
