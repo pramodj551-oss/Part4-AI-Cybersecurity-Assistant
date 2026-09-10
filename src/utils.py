@@ -23,6 +23,15 @@ _SENSITIVE_PATTERNS = (
     re.compile(r"(?i)(token\s*[:=]\s*)[^\s,;]+"),
 )
 
+_SENSITIVE_FIELD_NAMES = {
+    "api_key",
+    "api-key",
+    "authorization",
+    "password",
+    "secret",
+    "token",
+}
+
 
 def redact_sensitive_data(message: object) -> str:
     """Return a log-safe representation with common credential values redacted."""
@@ -44,7 +53,7 @@ class PrivacyRedactionFilter(logging.Filter):
 def audit_event(logger: logging.Logger, event: str, **fields: object) -> None:
     """Emit a privacy-safe structured audit event without logging field values raw."""
     safe_fields = " ".join(
-        f"{key}={redact_sensitive_data(value)}"
+        f"{key}={'[REDACTED]' if key.lower() in _SENSITIVE_FIELD_NAMES else redact_sensitive_data(value)}"
         for key, value in sorted(fields.items())
     )
     logger.info("audit_event=%s %s", redact_sensitive_data(event), safe_fields)
