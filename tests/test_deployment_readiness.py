@@ -50,9 +50,10 @@ def test_production_readiness_validates_configuration():
 
 
 def test_non_production_readiness_does_not_require_production_config():
-    with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch(
+    with patch("scripts.healthcheck.urlopen") as mock_urlopen, patch.dict(
         "os.environ", {"APP_ENVIRONMENT": "development"}, clear=False
     ):
+        mock_urlopen.return_value = _Response()
         assert healthcheck.check_readiness(8502) is True
 
 
