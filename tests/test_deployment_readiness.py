@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from scripts import healthcheck
 
+_ORIGINAL_IMPORT = __import__
+
 
 class _Response:
     status = 200
@@ -37,12 +39,10 @@ def test_readiness_fails_when_streamlit_is_unavailable():
 
 
 def test_production_readiness_validates_configuration():
+    _production_config_import.validate_called = False
     with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch.dict(
         "os.environ", {"APP_ENVIRONMENT": "production"}, clear=False
-    ), patch(
-        "builtins.__import__",
-        side_effect=_production_config_import,
-    ):
+    ), patch("builtins.__import__", side_effect=_production_config_import):
         assert healthcheck.check_readiness(8502) is True
     assert _production_config_import.validate_called is True
 
@@ -72,9 +72,7 @@ def _production_config_import(name, *args, **kwargs):
                 _production_config_import.validate_called = True
 
         return _ConfigModule
-    import builtins
-
-    return builtins.__import__(name, *args, **kwargs)
+    return _ORIGINAL_IMPORT(name, *args, **kwargs)
 
 
 _production_config_import.validate_called = False
