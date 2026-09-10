@@ -13,7 +13,7 @@ from pathlib import Path
 import streamlit as st
 
 from config.config import KNOWLEDGE_BASE_DIR
-# from src.auth import render_logout, require_auth
+from src.auth import render_logout, require_auth
 from src.utils import file_size_mb
 
 
@@ -23,8 +23,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# require_auth()
-# render_logout()
+require_auth()
+render_logout()
 
 st.title("📚 Knowledge Base")
 
