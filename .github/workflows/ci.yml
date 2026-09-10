@@ -60,6 +60,25 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: AUTH-01 mandatory gate
         run: PYTHONPATH=. pytest -q tests/test_auth.py
+  config-security:
+    name: CONFIG-SEC-01 production configuration security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install production dependencies from authoritative lock
+        run: python -m pip install --require-hashes -r requirements.txt
+      - name: Install test runner
+        run: python -m pip install -r requirements-dev.txt
+      - name: CONFIG-SEC-01 mandatory gate
+        run: PYTHONPATH=. pytest -q tests/test_config_security.py
   python-compatibility:
     name: Python compatibility (${{ matrix.python-version }})
     runs-on: ubuntu-latest
