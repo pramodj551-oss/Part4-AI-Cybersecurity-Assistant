@@ -39,9 +39,12 @@ def test_readiness_fails_when_streamlit_is_unavailable():
 def test_production_readiness_validates_configuration():
     with patch("scripts.healthcheck.urlopen", return_value=_Response()), patch.dict(
         "os.environ", {"APP_ENVIRONMENT": "production"}, clear=False
-    ), patch("config.config.validate_production_config") as validate:
+    ), patch(
+        "builtins.__import__",
+        side_effect=_production_config_import,
+    ):
         assert healthcheck.check_readiness(8502) is True
-    validate.assert_called_once()
+    assert _production_config_import.validate_called is True
 
 
 def test_non_production_readiness_does_not_require_production_config():
@@ -59,3 +62,19 @@ def test_dockerfile_declares_secure_runtime_contract():
     assert "HEALTHCHECK" in dockerfile
     assert "scripts/healthcheck.py --health --port 8502" in dockerfile
     assert "pip install --no-cache-dir --require-hashes -r requirements.txt" in dockerfile
+
+
+def _production_config_import(name, *args, **kwargs):
+    if name == "config.config":
+        class _ConfigModule:
+            @staticmethod
+            def validate_production_config():
+                _production_config_import.validate_called = True
+
+        return _ConfigModule
+    import builtins
+
+    return builtins.__import__(name, *args, **kwargs)
+
+
+_production_config_import.validate_called = False
