@@ -10,4 +10,5 @@ def test_chat_page_initializes_verified_startup_before_rag_pipeline():
     assert "from src.startup import check_startup" in source
     assert "if not check_startup():" in source
     assert "st.error(\"The assistant is not ready: required startup dependencies are unavailable.\")" in source
-    assert source.index("if not check_startup():") < source.index("from src.rag_pipeline import rag_pipeline")
+    assert source.index("if not check_startup():") < source.index("require_auth()")
+    assert source.index("if not check_startup():") < source.index("result = rag_pipeline.answer(question)")
