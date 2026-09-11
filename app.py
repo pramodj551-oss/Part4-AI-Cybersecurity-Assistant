@@ -12,6 +12,7 @@ import streamlit as st
 
 from config.config import APP_ICON, APP_TITLE
 from src.auth import render_logout, require_auth
+from src.startup import check_startup
 
 
 # ----------------------------------------------------------
@@ -24,6 +25,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ----------------------------------------------------------
+# Startup Gate
+# ----------------------------------------------------------
+
+if not check_startup():
+    st.error("The assistant is not ready: required startup dependencies are unavailable.")
+    st.stop()
 
 # ----------------------------------------------------------
 # Authentication Gate
