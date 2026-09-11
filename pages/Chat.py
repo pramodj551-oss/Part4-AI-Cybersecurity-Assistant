@@ -4,6 +4,7 @@ import streamlit as st
 
 from config.config import APP_ICON
 from src.auth import render_logout, require_auth
+from src.startup import check_startup
 from src.rag_pipeline import rag_pipeline
 
 st.set_page_config(
@@ -11,6 +12,13 @@ st.set_page_config(
     page_icon=APP_ICON,
     layout="wide",
 )
+
+# Streamlit multipage navigation can execute this page directly. Therefore the
+# Chat entrypoint must enforce the same verified production startup gate as the
+# home page before exposing the RAG pipeline.
+if not check_startup():
+    st.error("The assistant is not ready: required startup dependencies are unavailable.")
+    st.stop()
 
 require_auth()
 render_logout()
