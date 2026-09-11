@@ -4,7 +4,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_PORT=8502 \
     HF_HOME=/opt/huggingface
 
 WORKDIR /app
@@ -30,9 +29,11 @@ RUN mkdir -p /app/models /app/vectorstore /app/logs /opt/huggingface \
 
 USER app
 
+# Render injects PORT at runtime (currently 10000). Keep 8502 as the local/default port.
 EXPOSE 8502
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python scripts/healthcheck.py --health --port 8502
+    CMD python scripts/healthcheck.py --health --port "${PORT:-8502}"
 
-CMD ["streamlit", "run", "app.py", "--server.maxUploadSize=1024"]
+# Bind Streamlit to Render's injected PORT; fall back to 8502 for local/container use.
+CMD ["sh", "-c", "exec streamlit run app.py --server.port=${PORT:-8502} --server.maxUploadSize=1024"]

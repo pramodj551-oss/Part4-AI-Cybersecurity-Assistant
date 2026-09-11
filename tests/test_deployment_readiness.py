@@ -63,7 +63,8 @@ def test_dockerfile_declares_secure_runtime_contract():
     assert "USER app" in dockerfile
     assert "EXPOSE 8502" in dockerfile
     assert "HEALTHCHECK" in dockerfile
-    assert "scripts/healthcheck.py --health --port 8502" in dockerfile
+    assert 'scripts/healthcheck.py --health --port "${PORT:-8502}"' in dockerfile
+    assert "--server.port=${PORT:-8502}" in dockerfile
     assert "pip install --no-cache-dir --require-hashes -r requirements.txt" in dockerfile
 
 
