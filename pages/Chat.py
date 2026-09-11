@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# require_auth()
+require_auth()
 render_logout()
 
 st.title("💬 Cybersecurity AI Assistant")
