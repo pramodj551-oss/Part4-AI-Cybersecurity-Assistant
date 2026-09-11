@@ -1,8 +1,13 @@
 """Startup contract tests for verified FAISS initialization."""
 
+import sys
 from types import SimpleNamespace
 
 import src.startup as startup
+
+
+def _fake_vector_store(load):
+    return SimpleNamespace(vector_store_manager=SimpleNamespace(load=load))
 
 
 def test_startup_initializes_vector_store(monkeypatch):
@@ -11,16 +16,8 @@ def test_startup_initializes_vector_store(monkeypatch):
     def fake_load():
         calls.append("load")
 
-    fake_module = SimpleNamespace(
-        vector_store_manager=SimpleNamespace(load=fake_load)
-    )
-
+    monkeypatch.setitem(sys.modules, "src.vector_store", _fake_vector_store(fake_load))
     monkeypatch.setattr(startup, "check_runtime_dependencies", lambda: True)
-    monkeypatch.setattr(
-        startup.importlib,
-        "import_module",
-        lambda name: fake_module if name == "src.vector_store" else object(),
-    )
     monkeypatch.setattr(startup, "_vector_store_initialized", False)
 
     assert startup.check_startup() is True
@@ -32,16 +29,8 @@ def test_startup_fails_when_faiss_initialization_fails(monkeypatch):
     def fake_load():
         raise RuntimeError("FAISS index integrity check failed")
 
-    fake_module = SimpleNamespace(
-        vector_store_manager=SimpleNamespace(load=fake_load)
-    )
-
+    monkeypatch.setitem(sys.modules, "src.vector_store", _fake_vector_store(fake_load))
     monkeypatch.setattr(startup, "check_runtime_dependencies", lambda: True)
-    monkeypatch.setattr(
-        startup.importlib,
-        "import_module",
-        lambda name: fake_module if name == "src.vector_store" else object(),
-    )
     monkeypatch.setattr(startup, "_vector_store_initialized", False)
 
     assert startup.check_startup() is False
