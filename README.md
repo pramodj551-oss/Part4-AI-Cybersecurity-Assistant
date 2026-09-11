@@ -57,6 +57,38 @@ streamlit run app.py
 
 The authoritative incident dataset is `data/cybersecurity_incident_reports.csv`.
 
+## Streamlit sign-in
+
+The application uses environment-based authentication. The documented default username is:
+
+```text
+Username: analyst
+```
+
+**There is intentionally no default production password in this repository.** A plaintext password committed to README, source code, or `.env.example` would expose a public credential and violate the production security model.
+
+### Local development
+
+Set `AUTH_USERNAME=analyst` and generate a password hash with the repository helper:
+
+```bash
+python scripts/generate_auth_hash.py
+```
+
+Store the generated value as `AUTH_PASSWORD_HASH` in your local `.env` file. Use the password you entered when generating the hash to sign in to the Streamlit application.
+
+### Render production deployment
+
+For the deployed Streamlit application, configure these values in the Render service environment/secret settings:
+
+```text
+APP_ENVIRONMENT=production
+AUTH_USERNAME=analyst
+AUTH_PASSWORD_HASH=<PBKDF2-SHA256 hash stored as a Render secret>
+```
+
+Do **not** put the production password or password hash in GitHub source files, README, issue comments, or screenshots. If the password needs to be changed, generate a new PBKDF2-SHA256 hash and replace the Render `AUTH_PASSWORD_HASH` secret.
+
 ## Persisted FAISS index security
 
 LangChain's local FAISS loader uses pickle for metadata. This project therefore refuses to load a persisted index unless `FAISS_INDEX_PKL_SHA256` exactly matches the SHA-256 of `vectorstore/faiss_index/index.pkl`.
