@@ -4,7 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
-    STREAMLIT_SERVER_PORT=8502
+    STREAMLIT_SERVER_PORT=8502 \
+    HF_HOME=/opt/huggingface
 
 WORKDIR /app
 
@@ -15,8 +16,15 @@ RUN python -m pip install --no-cache-dir --require-hashes -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/models /app/vectorstore /app/logs \
-    && chown -R app:app /app
+# Build the production FAISS artifact from the tracked authoritative dataset.
+# APP_ENVIRONMENT is forced to development only for image-build configuration
+# validation; runtime production configuration remains explicit and fail-closed.
+RUN mkdir -p /app/models /app/vectorstore /app/logs /opt/huggingface \
+    && APP_ENVIRONMENT=development HF_HOME=/opt/huggingface \
+       python scripts/build_vectorstore.py --output /app/vectorstore/faiss_index \
+    && sha256sum /app/vectorstore/faiss_index/index.pkl \
+       > /app/vectorstore/faiss_index/index.pkl.sha256 \
+    && chown -R app:app /app /opt/huggingface
 
 USER app
 
