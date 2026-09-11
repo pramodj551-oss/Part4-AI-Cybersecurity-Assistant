@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,12 @@ def initialize_vector_store() -> bool:
 
 
 def check_startup() -> bool:
-    """Validate runtime dependencies and initialize the verified FAISS store."""
+    """Validate dependencies and require FAISS initialization in production."""
     if not check_runtime_dependencies():
         return False
+
+    environment = os.getenv("APP_ENVIRONMENT", "development").strip().lower()
+    if environment not in {"production", "prod"}:
+        return True
+
     return initialize_vector_store()
