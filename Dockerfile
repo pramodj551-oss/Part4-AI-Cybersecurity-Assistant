@@ -19,8 +19,10 @@ COPY . .
 # Build the production FAISS artifact from the tracked authoritative dataset.
 # APP_ENVIRONMENT is forced to development only for image-build configuration
 # validation; runtime production configuration remains explicit and fail-closed.
+# PYTHONPATH is explicit because executing scripts/build_vectorstore.py sets
+# sys.path[0] to /app/scripts rather than the repository root.
 RUN mkdir -p /app/models /app/vectorstore /app/logs /opt/huggingface \
-    && APP_ENVIRONMENT=development HF_HOME=/opt/huggingface \
+    && APP_ENVIRONMENT=development HF_HOME=/opt/huggingface PYTHONPATH=/app \
        python scripts/build_vectorstore.py --output /app/vectorstore/faiss_index \
     && sha256sum /app/vectorstore/faiss_index/index.pkl \
        > /app/vectorstore/faiss_index/index.pkl.sha256 \
