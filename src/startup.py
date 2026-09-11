@@ -16,6 +16,8 @@ _REQUIRED_RUNTIME_MODULES = (
     "src.vector_store",
 )
 
+_vector_store_initialized = False
+
 
 def check_runtime_dependencies() -> bool:
     """Return False instead of crashing when a required module is unavailable."""
@@ -28,6 +30,27 @@ def check_runtime_dependencies() -> bool:
     return True
 
 
+def initialize_vector_store() -> bool:
+    """Load the verified production FAISS artifact into the application process."""
+    global _vector_store_initialized
+
+    if _vector_store_initialized:
+        return True
+
+    try:
+        from src.vector_store import vector_store_manager
+
+        vector_store_manager.load()
+        _vector_store_initialized = True
+        logger.info("Verified FAISS vector store initialized successfully.")
+        return True
+    except Exception:
+        logger.exception("Verified FAISS vector store initialization failed.")
+        return False
+
+
 def check_startup() -> bool:
-    """Validate required runtime imports for startup/readiness checks."""
-    return check_runtime_dependencies()
+    """Validate runtime dependencies and initialize the verified FAISS store."""
+    if not check_runtime_dependencies():
+        return False
+    return initialize_vector_store()
