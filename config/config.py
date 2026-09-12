@@ -30,14 +30,19 @@ EMBEDDING_MODEL = os.getenv(
     "sentence-transformers/all-MiniLM-L6-v2",
 )
 
-# Local defaults are intentionally supported for development only. Production
-# deployments must provide explicit, non-default secrets and endpoints.
+# Local Ollama remains the development default. Production may use the
+# OpenAI-compatible Groq endpoint when LLM_PROVIDER=groq.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
 LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "llama2")).strip()
-API_KEY = os.getenv("API_KEY", "ollama").strip()
+API_KEY = os.getenv("API_KEY", os.getenv("GROQ_API_KEY", "ollama")).strip()
+_default_api_base = (
+    "https://api.groq.com/openai/v1"
+    if LLM_PROVIDER == "groq"
+    else "http://localhost:11434/v1"
+)
 API_BASE_URL = os.getenv(
     "API_BASE_URL",
-    os.getenv("OLLAMA_API_BASE", "http://localhost:11434/v1"),
+    os.getenv("OLLAMA_API_BASE", _default_api_base),
 ).rstrip("/")
 
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
