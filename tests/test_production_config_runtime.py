@@ -16,9 +16,9 @@ def _load_config(monkeypatch, **env):
         "AUTH_USERNAME": "analyst",
         "AUTH_PASSWORD_HASH": "pbkdf2_sha256$600000$test$" + "a" * 64,
         "LLM_PROVIDER": "groq",
-        "LLM_MODEL": "production-model",
+        "LLM_MODEL": "openai/gpt-oss-120b",
         "API_KEY": "test-api-key",
-        "API_BASE_URL": "https://api.example.com/v1",
+        "API_BASE_URL": "https://api.groq.com/openai/v1",
     }
     defaults.update(env)
     for key, value in defaults.items():
@@ -29,14 +29,14 @@ def _load_config(monkeypatch, **env):
     return config
 
 
-def test_production_config_accepts_explicit_openai_compatible_runtime(monkeypatch):
+def test_production_config_accepts_explicit_groq_runtime(monkeypatch):
     config = _load_config(monkeypatch)
 
     config.validate_production_config()
     assert config.APP_ENVIRONMENT == "production"
     assert config.LLM_PROVIDER == "groq"
-    assert config.LLM_MODEL == "production-model"
-    assert config.API_BASE_URL == "https://api.example.com/v1"
+    assert config.LLM_MODEL == "openai/gpt-oss-120b"
+    assert config.API_BASE_URL == "https://api.groq.com/openai/v1"
 
 
 def test_production_config_rejects_localhost_runtime(monkeypatch):
