@@ -1,7 +1,6 @@
 """Regression tests for production LLM runtime configuration validation."""
 
 import importlib
-import os
 import sys
 
 import pytest
