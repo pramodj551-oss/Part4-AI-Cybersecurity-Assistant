@@ -1,7 +1,5 @@
 """Regression tests for low-memory embedding runtime safeguards."""
 
-import os
-
 
 def test_embedding_runtime_limits_cpu_thread_pools_before_hf_import():
     source = open("src/embeddings.py", encoding="utf-8").read()
