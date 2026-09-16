@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import pickle
 from pathlib import Path
 
+from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
@@ -30,14 +32,46 @@ class VectorStoreManager:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def create(self, documents: list[Document]):
+    def create(self, documents: list[Document], ids: list[str] | None = None):
         if not documents:
             raise ValueError("No documents supplied.")
+        if ids is not None:
+            if len(ids) != len(documents):
+                raise ValueError("ids must contain one ID for each document.")
+            if len(set(ids)) != len(ids) or any(not item for item in ids):
+                raise ValueError("ids must contain unique non-empty values.")
         self.vector_store = FAISS.from_documents(
             documents=documents,
             embedding=embedding_manager.get_embedding_model(),
+            **({"ids": ids} if ids is not None else {}),
         )
         return self.vector_store
+
+    @staticmethod
+    def _write_deterministic_metadata(path: Path) -> None:
+        """Rewrite LangChain's pickle payload in a stable insertion order/protocol."""
+        pickle_path = path / "index.pkl"
+        with pickle_path.open("rb") as handle:
+            docstore, index_to_docstore_id = pickle.load(handle)
+
+        source_docs = getattr(docstore, "_dict", None)
+        if not isinstance(source_docs, dict):
+            raise RuntimeError("FAISS docstore does not expose a serializable document mapping.")
+
+        ordered_ids = [index_to_docstore_id[key] for key in sorted(index_to_docstore_id)]
+        ordered_docs = {doc_id: source_docs[doc_id] for doc_id in ordered_ids}
+        canonical_docstore = InMemoryDocstore(ordered_docs)
+        canonical_mapping = {
+            int(key): index_to_docstore_id[key]
+            for key in sorted(index_to_docstore_id)
+        }
+
+        with pickle_path.open("wb") as handle:
+            pickle.dump(
+                (canonical_docstore, canonical_mapping),
+                handle,
+                protocol=4,
+            )
 
     def save(self, path: str | Path = VECTOR_INDEX_PATH):
         if self.vector_store is None:
@@ -46,6 +80,7 @@ class VectorStoreManager:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         self.vector_store.save_local(str(path))
+        self._write_deterministic_metadata(path)
 
         pickle_path = path / "index.pkl"
         digest = self._sha256(pickle_path)
