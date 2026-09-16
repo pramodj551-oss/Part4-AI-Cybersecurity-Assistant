@@ -11,6 +11,11 @@ from src.data_loader import data_loader
 from src.vector_store import vector_store_manager
 
 
+def _document_id(row_number: int) -> str:
+    """Return a stable document ID so FAISS metadata is reproducible across builds."""
+    return f"incident-{row_number}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default=str(VECTOR_INDEX_PATH))
@@ -20,6 +25,7 @@ def main() -> None:
     data_loader.validate(dataframe)
 
     documents = []
+    ids = []
     for row_number, row in dataframe.fillna("").iterrows():
         fields = [f"{column}: {row[column]}" for column in dataframe.columns]
         documents.append(
@@ -28,8 +34,9 @@ def main() -> None:
                 metadata={"source": INCIDENT_DATASET.name, "row": int(row_number)},
             )
         )
+        ids.append(_document_id(int(row_number)))
 
-    vector_store_manager.create(documents)
+    vector_store_manager.create(documents, ids=ids)
     digest = vector_store_manager.save(args.output)
     print(f"FAISS index created: {args.output}")
     print(f"index.pkl SHA-256: {digest}")
