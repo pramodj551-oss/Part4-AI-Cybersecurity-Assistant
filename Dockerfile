@@ -16,15 +16,15 @@ RUN python -m pip install --no-cache-dir --require-hashes -r requirements.txt
 COPY . .
 
 # Build the production FAISS artifact from the tracked authoritative dataset.
-# APP_ENVIRONMENT is forced to development only for image-build configuration
-# validation; runtime production configuration remains explicit and fail-closed.
-# PYTHONPATH is explicit because executing scripts/build_vectorstore.py sets
-# sys.path[0] to /app/scripts rather than the repository root.
+# The source-controlled checksum is the immutable provenance contract for the
+# generated pickle artifact. A build that produces a different artifact fails.
 RUN mkdir -p /app/models /app/vectorstore /app/logs /opt/huggingface \
     && APP_ENVIRONMENT=development HF_HOME=/opt/huggingface PYTHONPATH=/app \
        python scripts/build_vectorstore.py --output /app/vectorstore/faiss_index \
     && sha256sum /app/vectorstore/faiss_index/index.pkl \
        > /app/vectorstore/faiss_index/index.pkl.sha256 \
+    && test "$(cut -d ' ' -f1 /app/vectorstore/faiss_index/index.pkl.sha256)" = \
+       "$(tr -d '[:space:]' < /app/config/faiss_index.pkl.sha256)" \
     && chown -R app:app /app /opt/huggingface
 
 USER app
