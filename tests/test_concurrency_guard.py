@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-import time
 
 import pytest
 
@@ -60,9 +59,14 @@ def test_rag_pipeline_controls_expensive_path(monkeypatch):
     started = threading.Event()
     unblock = threading.Event()
 
+    def blocking_retrieve(question):
+        started.set()
+        unblock.wait(2)
+        return []
+
     monkeypatch.setattr(
         "src.rag_pipeline.retriever_manager.retrieve",
-        lambda question: started.set() or unblock.wait(2) or [],
+        blocking_retrieve,
     )
     monkeypatch.setattr(
         "src.rag_pipeline.prompt_builder.build_prompt",
@@ -96,6 +100,7 @@ def test_rag_pipeline_controls_expensive_path(monkeypatch):
 
     unblock.set()
     worker.join(timeout=2)
+    assert not worker.is_alive()
     assert result_holder["result"]["answer"] == "ok"
 
 
