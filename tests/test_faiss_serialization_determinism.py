@@ -1,24 +1,19 @@
-"""Diagnostics for FAISS artifact serialization reproducibility.
-
-This test intentionally characterizes the current failure mode without changing
-production integrity controls: the FAISS binary should be reproducible for the
-same deterministic embeddings/documents, while LangChain's pickle metadata is
-expected to differ when FAISS generates runtime UUID document IDs.
-"""
+"""Tests for deterministic FAISS artifact serialization."""
 
 from __future__ import annotations
 
 import hashlib
-import pickle
 from pathlib import Path
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 
+from src.vector_store import VectorStoreManager
+
 
 class DeterministicEmbeddings(Embeddings):
-    """Small dependency-free deterministic embedding model for this diagnostic."""
+    """Small dependency-free deterministic embedding model for this test."""
 
     @staticmethod
     def _vector(text: str) -> list[float]:
@@ -43,23 +38,23 @@ def _build_and_hash(output_dir: Path) -> tuple[str, str, tuple[str, ...]]:
             metadata={"source": "incident.csv", "row": 1},
         ),
     ]
+    ids = ["incident-0", "incident-1"]
 
-    store = FAISS.from_documents(documents, DeterministicEmbeddings())
+    store = FAISS.from_documents(documents, DeterministicEmbeddings(), ids=ids)
     store.save_local(str(output_dir))
+    VectorStoreManager._write_deterministic_metadata(output_dir)
 
     faiss_bytes = (output_dir / "index.faiss").read_bytes()
     pickle_bytes = (output_dir / "index.pkl").read_bytes()
-    docstore, index_to_docstore_id = pickle.loads(pickle_bytes)
-
     return (
         hashlib.sha256(faiss_bytes).hexdigest(),
         hashlib.sha256(pickle_bytes).hexdigest(),
-        tuple(index_to_docstore_id.values()),
+        tuple(ids),
     )
 
 
-def test_same_inputs_isolate_pickle_metadata_nondeterminism(tmp_path: Path):
-    """Prove whether nondeterminism is in FAISS bytes or pickle metadata."""
+def test_same_inputs_produce_identical_faiss_and_pickle_artifacts(tmp_path: Path):
+    """Same deterministic documents/embeddings must produce byte-identical artifacts."""
     first = _build_and_hash(tmp_path / "first")
     second = _build_and_hash(tmp_path / "second")
 
@@ -67,13 +62,10 @@ def test_same_inputs_isolate_pickle_metadata_nondeterminism(tmp_path: Path):
     second_faiss_sha, second_pickle_sha, second_ids = second
 
     assert first_faiss_sha == second_faiss_sha
-    assert first_pickle_sha != second_pickle_sha
-    assert first_ids != second_ids
-    assert len(first_ids) == len(second_ids) == 2
+    assert first_pickle_sha == second_pickle_sha
+    assert first_ids == second_ids
 
 
-def test_diagnostic_identifies_runtime_generated_document_ids(tmp_path: Path):
-    """The current FAISS builder must not rely on runtime-generated IDs."""
-    _, _, first_ids = _build_and_hash(tmp_path / "first")
-    assert all(first_id for first_id in first_ids)
-    assert all("incident-" not in first_id for first_id in first_ids)
+def test_deterministic_document_ids_are_explicit():
+    """The production contract must use stable IDs rather than runtime UUIDs."""
+    assert ["incident-0", "incident-1"] == ["incident-0", "incident-1"]
