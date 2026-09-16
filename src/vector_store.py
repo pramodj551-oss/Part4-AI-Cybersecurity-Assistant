@@ -30,12 +30,15 @@ class VectorStoreManager:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def create(self, documents: list[Document]):
+    def create(self, documents: list[Document], ids: list[str] | None = None):
         if not documents:
             raise ValueError("No documents supplied.")
+        if ids is not None and len(ids) != len(documents):
+            raise ValueError("ids must contain one ID for each document.")
         self.vector_store = FAISS.from_documents(
             documents=documents,
             embedding=embedding_manager.get_embedding_model(),
+            **({"ids": ids} if ids is not None else {}),
         )
         return self.vector_store
 
