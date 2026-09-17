@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import pickle
+import pickletools
 import subprocess
 import sys
 from pathlib import Path
@@ -81,6 +82,17 @@ def _pickle_payload(path: Path):
         return pickle.load(handle)
 
 
+def _opcode_window(data: bytes, center: int, radius: int = 90) -> list[str]:
+    """Return pickle opcode text around a byte offset for root-cause evidence."""
+    start = max(0, center - radius)
+    end = min(len(data), center + radius)
+    lines: list[str] = []
+    for opcode, arg, position in pickletools.genops(data):
+        if start <= position < end:
+            lines.append(f"{position}: {opcode.name} {arg!r}")
+    return lines
+
+
 def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
     """Two isolated builds must reproduce identical FAISS and pickle bytes."""
     first_dir = tmp_path / "first"
@@ -93,12 +105,21 @@ def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
     first_pickle = (first_dir / "index.pkl").read_bytes()
     second_pickle = (second_dir / "index.pkl").read_bytes()
 
+    faiss_diff = _first_difference(first_faiss, second_faiss)
+    pickle_diff = _first_difference(first_pickle, second_pickle)
     print(f"index.faiss SHA-256 A: {first_faiss_sha}")
     print(f"index.faiss SHA-256 B: {second_faiss_sha}")
     print(f"index.pkl SHA-256 A: {first_pickle_sha}")
     print(f"index.pkl SHA-256 B: {second_pickle_sha}")
-    print(f"index.faiss first differing byte: {_first_difference(first_faiss, second_faiss)}")
-    print(f"index.pkl first differing byte: {_first_difference(first_pickle, second_pickle)}")
+    print(f"index.faiss first differing byte: {faiss_diff}")
+    print(f"index.pkl first differing byte: {pickle_diff}")
+    if pickle_diff is not None:
+        print("index.pkl opcode window A:")
+        print("\n".join(_opcode_window(first_pickle, pickle_diff)))
+        print("index.pkl opcode window B:")
+        print("\n".join(_opcode_window(second_pickle, pickle_diff)))
+        print(f"index.pkl bytes A[{pickle_diff}:{pickle_diff + 32}]: {first_pickle[pickle_diff:pickle_diff + 32].hex()}")
+        print(f"index.pkl bytes B[{pickle_diff}:{pickle_diff + 32}]: {second_pickle[pickle_diff:pickle_diff + 32].hex()}")
 
     assert first_faiss_sha == second_faiss_sha
     assert first_pickle_sha == second_pickle_sha
