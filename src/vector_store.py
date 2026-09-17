@@ -18,6 +18,14 @@ from src.embeddings import embedding_manager
 logger = logging.getLogger(__name__)
 
 
+class _DeterministicSet(set):
+    """Set with a stable pickle representation for string-valued metadata."""
+
+    def __reduce_ex__(self, protocol):
+        del protocol
+        return (type(self), (tuple(sorted(self, key=repr)),))
+
+
 class VectorStoreManager:
     """Manage FAISS indexes without loading unverified pickle artifacts."""
 
@@ -48,7 +56,14 @@ class VectorStoreManager:
         return self.vector_store
 
     @staticmethod
-    def _write_deterministic_metadata(path: Path) -> None:
+    def _canonicalize_document_state(document: Document) -> None:
+        """Replace unordered Pydantic field sets with deterministic set objects."""
+        fields_set = getattr(document, "__pydantic_fields_set__", None)
+        if isinstance(fields_set, set) and not isinstance(fields_set, _DeterministicSet):
+            object.__setattr__(document, "__pydantic_fields_set__", _DeterministicSet(fields_set))
+
+    @classmethod
+    def _write_deterministic_metadata(cls, path: Path) -> None:
         """Rewrite LangChain's pickle payload in a stable insertion order/protocol."""
         pickle_path = path / "index.pkl"
         with pickle_path.open("rb") as handle:
@@ -59,7 +74,12 @@ class VectorStoreManager:
             raise RuntimeError("FAISS docstore does not expose a serializable document mapping.")
 
         ordered_ids = [index_to_docstore_id[key] for key in sorted(index_to_docstore_id)]
-        ordered_docs = {doc_id: source_docs[doc_id] for doc_id in ordered_ids}
+        ordered_docs = {}
+        for doc_id in ordered_ids:
+            document = source_docs[doc_id]
+            cls._canonicalize_document_state(document)
+            ordered_docs[doc_id] = document
+
         canonical_docstore = InMemoryDocstore(ordered_docs)
         canonical_mapping = {
             int(key): index_to_docstore_id[key]
