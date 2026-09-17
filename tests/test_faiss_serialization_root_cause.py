@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import pickle
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _build_in_subprocess(output_dir: Path, hash_seed: str) -> tuple[str, str]:
+    """Build an artifact in an isolated Python process with a fixed hash seed."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    script = r'''
+import hashlib
+import sys
 from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-
+from src.vector_store import VectorStoreManager
 
 class DeterministicEmbeddings(Embeddings):
-    """Dependency-free deterministic embeddings for byte-level diagnostics."""
-
     @staticmethod
     def _vector(text: str) -> list[float]:
         digest = hashlib.sha256(text.encode("utf-8")).digest()
@@ -25,21 +35,36 @@ class DeterministicEmbeddings(Embeddings):
     def embed_query(self, text: str) -> list[float]:
         return self._vector(text)
 
-
-def _build(output_dir: Path) -> None:
-    documents = [
-        Document(
-            page_content="incident: suspicious login sequence",
-            metadata={"source": "incident.csv", "row": 0},
-        ),
-        Document(
-            page_content="incident: repeated failed authentication",
-            metadata={"source": "incident.csv", "row": 1},
-        ),
-    ]
-    ids = ["incident-0", "incident-1"]
-    store = FAISS.from_documents(documents, DeterministicEmbeddings(), ids=ids)
-    store.save_local(str(output_dir))
+output_dir = Path(sys.argv[1])
+documents = [
+    Document(
+        id="incident-0",
+        page_content="incident: suspicious login sequence",
+        metadata={"source": "incident.csv", "row": 0},
+    ),
+    Document(
+        id="incident-1",
+        page_content="incident: repeated failed authentication",
+        metadata={"source": "incident.csv", "row": 1},
+    ),
+]
+ids = ["incident-0", "incident-1"]
+store = FAISS.from_documents(documents, DeterministicEmbeddings(), ids=ids)
+store.save_local(str(output_dir))
+VectorStoreManager._write_deterministic_metadata(output_dir)
+'''
+    env = os.environ.copy()
+    env["PYTHONHASHSEED"] = hash_seed
+    subprocess.run(
+        [sys.executable, "-c", script, str(output_dir)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    faiss_sha = hashlib.sha256((output_dir / "index.faiss").read_bytes()).hexdigest()
+    pickle_sha = hashlib.sha256((output_dir / "index.pkl").read_bytes()).hexdigest()
+    return faiss_sha, pickle_sha
 
 
 def _first_difference(left: bytes, right: bytes) -> int | None:
@@ -51,22 +76,22 @@ def _first_difference(left: bytes, right: bytes) -> int | None:
     return None
 
 
-def test_two_consecutive_builds_report_independent_artifact_hashes(tmp_path: Path):
-    """Capture independent SHA-256 values and locate any byte-level difference."""
+def _pickle_payload(path: Path):
+    with path.open("rb") as handle:
+        return pickle.load(handle)
+
+
+def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
+    """Two isolated builds must reproduce identical FAISS and pickle bytes."""
     first_dir = tmp_path / "first"
     second_dir = tmp_path / "second"
-    _build(first_dir)
-    _build(second_dir)
+    first_faiss_sha, first_pickle_sha = _build_in_subprocess(first_dir, "1")
+    second_faiss_sha, second_pickle_sha = _build_in_subprocess(second_dir, "2")
 
     first_faiss = (first_dir / "index.faiss").read_bytes()
     second_faiss = (second_dir / "index.faiss").read_bytes()
     first_pickle = (first_dir / "index.pkl").read_bytes()
     second_pickle = (second_dir / "index.pkl").read_bytes()
-
-    first_faiss_sha = hashlib.sha256(first_faiss).hexdigest()
-    second_faiss_sha = hashlib.sha256(second_faiss).hexdigest()
-    first_pickle_sha = hashlib.sha256(first_pickle).hexdigest()
-    second_pickle_sha = hashlib.sha256(second_pickle).hexdigest()
 
     print(f"index.faiss SHA-256 A: {first_faiss_sha}")
     print(f"index.faiss SHA-256 B: {second_faiss_sha}")
@@ -79,19 +104,21 @@ def test_two_consecutive_builds_report_independent_artifact_hashes(tmp_path: Pat
     assert first_pickle_sha == second_pickle_sha
 
 
-def test_pickle_payload_is_structurally_equal_across_builds(tmp_path: Path):
-    """Inspect serialized docstore/mapping payload independently of pickle bytes."""
+def test_cross_process_pickle_payload_is_structurally_equal(tmp_path: Path):
+    """If bytes differ, distinguish payload drift from pickle-byte drift."""
     first_dir = tmp_path / "first"
     second_dir = tmp_path / "second"
-    _build(first_dir)
-    _build(second_dir)
+    _build_in_subprocess(first_dir, "1")
+    _build_in_subprocess(second_dir, "2")
 
-    with (first_dir / "index.pkl").open("rb") as handle:
-        first_docstore, first_mapping = pickle.load(handle)
-    with (second_dir / "index.pkl").open("rb") as handle:
-        second_docstore, second_mapping = pickle.load(handle)
+    first_docstore, first_mapping = _pickle_payload(first_dir / "index.pkl")
+    second_docstore, second_mapping = _pickle_payload(second_dir / "index.pkl")
 
-    assert first_docstore._dict == second_docstore._dict
+    first_ids = list(first_docstore._dict)
+    second_ids = list(second_docstore._dict)
+    first_documents = [first_docstore._dict[key] for key in first_ids]
+    second_documents = [second_docstore._dict[key] for key in second_ids]
+
+    assert first_ids == second_ids
     assert first_mapping == second_mapping
-    assert list(first_docstore._dict) == list(second_docstore._dict)
-    assert first_mapping.keys() == second_mapping.keys()
+    assert first_documents == second_documents
