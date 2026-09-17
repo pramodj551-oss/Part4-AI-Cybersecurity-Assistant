@@ -1,0 +1,167 @@
+"""Root-cause diagnostics for FAISS artifact serialization determinism."""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import pickle
+import pickletools
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _build_in_subprocess(output_dir: Path, hash_seed: str) -> tuple[str, str]:
+    """Build an artifact in an isolated Python process with a fixed hash seed."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    script = r'''
+import hashlib
+import sys
+from pathlib import Path
+
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_community.vectorstores import FAISS
+from src.vector_store import VectorStoreManager
+
+class DeterministicEmbeddings(Embeddings):
+    @staticmethod
+    def _vector(text: str) -> list[float]:
+        digest = hashlib.sha256(text.encode("utf-8")).digest()
+        return [byte / 255.0 for byte in digest[:8]]
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [self._vector(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._vector(text)
+
+output_dir = Path(sys.argv[1])
+documents = [
+    Document(
+        id="incident-0",
+        page_content="incident: suspicious login sequence",
+        metadata={"source": "incident.csv", "row": 0},
+    ),
+    Document(
+        id="incident-1",
+        page_content="incident: repeated failed authentication",
+        metadata={"source": "incident.csv", "row": 1},
+    ),
+]
+ids = ["incident-0", "incident-1"]
+store = FAISS.from_documents(documents, DeterministicEmbeddings(), ids=ids)
+store.save_local(str(output_dir))
+VectorStoreManager._write_deterministic_metadata(output_dir)
+'''
+    env = os.environ.copy()
+    env["PYTHONHASHSEED"] = hash_seed
+    subprocess.run(
+        [sys.executable, "-c", script, str(output_dir)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    faiss_sha = hashlib.sha256((output_dir / "index.faiss").read_bytes()).hexdigest()
+    pickle_sha = hashlib.sha256((output_dir / "index.pkl").read_bytes()).hexdigest()
+    return faiss_sha, pickle_sha
+
+
+def _first_difference(left: bytes, right: bytes) -> int | None:
+    for index, (left_byte, right_byte) in enumerate(zip(left, right)):
+        if left_byte != right_byte:
+            return index
+    if len(left) != len(right):
+        return min(len(left), len(right))
+    return None
+
+
+def _pickle_payload(path: Path):
+    with path.open("rb") as handle:
+        return pickle.load(handle)
+
+
+def _opcode_window(data: bytes, center: int, radius: int = 90) -> list[str]:
+    """Return pickle opcode text around a byte offset for root-cause evidence."""
+    start = max(0, center - radius)
+    end = min(len(data), center + radius)
+    return [
+        f"{position}: {opcode.name} {arg!r}"
+        for opcode, arg, position in pickletools.genops(data)
+        if start <= position < end
+    ]
+
+
+def _diagnostic_report(first: bytes, second: bytes, diff: int | None) -> str:
+    if diff is None:
+        return "index.pkl byte streams are identical; no byte-level drift found"
+    radius = 90
+    start = max(0, diff - radius)
+    end = min(max(len(first), len(second)), diff + radius)
+    lines = [
+        f"index.pkl first differing byte: {diff}",
+        f"index.pkl lengths: A={len(first)} B={len(second)}",
+        "index.pkl opcode window A:",
+        *_opcode_window(first, diff, radius),
+        "index.pkl opcode window B:",
+        *_opcode_window(second, diff, radius),
+        f"index.pkl bytes A[{diff}:{diff + 64}]: {first[diff:diff + 64].hex()}",
+        f"index.pkl bytes B[{diff}:{diff + 64}]: {second[diff:diff + 64].hex()}",
+        f"index.pkl context A[{start}:{end}]: {first[start:end].hex()}",
+        f"index.pkl context B[{start}:{end}]: {second[start:end].hex()}",
+    ]
+    return "\n".join(lines)
+
+
+def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
+    """Two isolated builds must reproduce identical FAISS and pickle bytes."""
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_faiss_sha, first_pickle_sha = _build_in_subprocess(first_dir, "1")
+    second_faiss_sha, second_pickle_sha = _build_in_subprocess(second_dir, "2")
+
+    first_faiss = (first_dir / "index.faiss").read_bytes()
+    second_faiss = (second_dir / "index.faiss").read_bytes()
+    first_pickle = (first_dir / "index.pkl").read_bytes()
+    second_pickle = (second_dir / "index.pkl").read_bytes()
+
+    faiss_diff = _first_difference(first_faiss, second_faiss)
+    pickle_diff = _first_difference(first_pickle, second_pickle)
+    print(f"index.faiss SHA-256 A: {first_faiss_sha}")
+    print(f"index.faiss SHA-256 B: {second_faiss_sha}")
+    print(f"index.pkl SHA-256 A: {first_pickle_sha}")
+    print(f"index.pkl SHA-256 B: {second_pickle_sha}")
+    print(f"index.faiss first differing byte: {faiss_diff}")
+    print(f"index.pkl first differing byte: {pickle_diff}")
+
+    if pickle_diff is not None:
+        report = _diagnostic_report(first_pickle, second_pickle, pickle_diff)
+        print(report)
+        # Put the full evidence in the assertion itself so CI annotation/output
+        # cannot hide the byte-level root-cause evidence behind stdout capture.
+        assert first_pickle_sha == second_pickle_sha, report
+    else:
+        assert first_pickle_sha == second_pickle_sha
+
+    assert first_faiss_sha == second_faiss_sha
+
+
+def test_cross_process_pickle_payload_is_structurally_equal(tmp_path: Path):
+    """If bytes differ, distinguish payload drift from pickle-byte drift."""
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    _build_in_subprocess(first_dir, "1")
+    _build_in_subprocess(second_dir, "2")
+
+    first_docstore, first_mapping = _pickle_payload(first_dir / "index.pkl")
+    second_docstore, second_mapping = _pickle_payload(second_dir / "index.pkl")
+
+    first_ids = list(first_docstore._dict)
+    second_ids = list(second_docstore._dict)
+    first_documents = [first_docstore._dict[key] for key in first_ids]
+    second_documents = [second_docstore._dict[key] for key in second_ids]
+
+    assert first_ids == second_ids
+    assert first_mapping == second_mapping
+    assert first_documents == second_documents
