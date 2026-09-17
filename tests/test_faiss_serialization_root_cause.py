@@ -19,9 +19,9 @@ import hashlib
 import sys
 from pathlib import Path
 
-from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_community.vectorstores import FAISS
 from src.vector_store import VectorStoreManager
 
 class DeterministicEmbeddings(Embeddings):
@@ -86,11 +86,32 @@ def _opcode_window(data: bytes, center: int, radius: int = 90) -> list[str]:
     """Return pickle opcode text around a byte offset for root-cause evidence."""
     start = max(0, center - radius)
     end = min(len(data), center + radius)
-    lines: list[str] = []
-    for opcode, arg, position in pickletools.genops(data):
-        if start <= position < end:
-            lines.append(f"{position}: {opcode.name} {arg!r}")
-    return lines
+    return [
+        f"{position}: {opcode.name} {arg!r}"
+        for opcode, arg, position in pickletools.genops(data)
+        if start <= position < end
+    ]
+
+
+def _diagnostic_report(first: bytes, second: bytes, diff: int | None) -> str:
+    if diff is None:
+        return "index.pkl byte streams are identical; no byte-level drift found"
+    radius = 90
+    start = max(0, diff - radius)
+    end = min(max(len(first), len(second)), diff + radius)
+    lines = [
+        f"index.pkl first differing byte: {diff}",
+        f"index.pkl lengths: A={len(first)} B={len(second)}",
+        "index.pkl opcode window A:",
+        *_opcode_window(first, diff, radius),
+        "index.pkl opcode window B:",
+        *_opcode_window(second, diff, radius),
+        f"index.pkl bytes A[{diff}:{diff + 64}]: {first[diff:diff + 64].hex()}",
+        f"index.pkl bytes B[{diff}:{diff + 64}]: {second[diff:diff + 64].hex()}",
+        f"index.pkl context A[{start}:{end}]: {first[start:end].hex()}",
+        f"index.pkl context B[{start}:{end}]: {second[start:end].hex()}",
+    ]
+    return "\n".join(lines)
 
 
 def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
@@ -113,16 +134,17 @@ def test_cross_process_faiss_artifacts_are_byte_identical(tmp_path: Path):
     print(f"index.pkl SHA-256 B: {second_pickle_sha}")
     print(f"index.faiss first differing byte: {faiss_diff}")
     print(f"index.pkl first differing byte: {pickle_diff}")
+
     if pickle_diff is not None:
-        print("index.pkl opcode window A:")
-        print("\n".join(_opcode_window(first_pickle, pickle_diff)))
-        print("index.pkl opcode window B:")
-        print("\n".join(_opcode_window(second_pickle, pickle_diff)))
-        print(f"index.pkl bytes A[{pickle_diff}:{pickle_diff + 32}]: {first_pickle[pickle_diff:pickle_diff + 32].hex()}")
-        print(f"index.pkl bytes B[{pickle_diff}:{pickle_diff + 32}]: {second_pickle[pickle_diff:pickle_diff + 32].hex()}")
+        report = _diagnostic_report(first_pickle, second_pickle, pickle_diff)
+        print(report)
+        # Put the full evidence in the assertion itself so CI annotation/output
+        # cannot hide the byte-level root-cause evidence behind stdout capture.
+        assert first_pickle_sha == second_pickle_sha, report
+    else:
+        assert first_pickle_sha == second_pickle_sha
 
     assert first_faiss_sha == second_faiss_sha
-    assert first_pickle_sha == second_pickle_sha
 
 
 def test_cross_process_pickle_payload_is_structurally_equal(tmp_path: Path):
