@@ -89,8 +89,7 @@ def _report(
 
     start = max(0, diff - 96)
     end = min(max(len(first_pickle), len(second_pickle)), diff + 96)
-    return "
-".join(
+    return "\n".join(
         [
             f"index.pkl first differing byte: {diff}",
             f"index.pkl lengths: A={len(first_pickle)} B={len(second_pickle)}",
