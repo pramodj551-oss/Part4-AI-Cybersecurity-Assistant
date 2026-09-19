@@ -34,6 +34,8 @@ jobs:
         run: PYTHONPATH=. pytest -q
       - name: Dependency vulnerability audit
         run: python -m pip_audit -r requirements.txt
+      - name: Production FAISS reproducibility diagnostic (uncaptured)
+        run: PYTHONPATH=. pytest -s -q tests/test_production_artifact_reproducibility.py
       - name: Reproducible dependency resolution check
         run: pip-compile --quiet --generate-hashes --output-file=/tmp/requirements.lock requirements.in
       - name: Publish generated authoritative lock candidate
