@@ -1,13 +1,1 @@
- 
-
-Production dataset SHA-256	5fac4166c4ac6c8f70525333329fa3f43122b52672f078c09671877381066c01
-index.faiss SHA A	7d8cb25e66c274e23070ea49e4e310cce0d4e4c3b68b22bbbc603ac794fcc1e8
-index.faiss SHA B	7d8cb25e66c274e23070ea49e4e310cce0d4e4c3b68b22bbbc603ac794fcc1e8
-index.pkl SHA A	590424fb3526de38d2d5ae836f930adc747a981567d4e4b7df80694967f7ae5f
-index.pkl SHA B	590424fb3526de38d2d5ae836f930adc747a981567d4e4b7df80694967f7ae5f
-index.faiss first differing byte	None
-index.pkl first differing byte	None
-Docstore IDs	True
-Index mapping	True
-Documents	True
-Diagnostic test	2 passed
+590424fb3526de38d2d5ae836f930adc747a981567d4e4b7df80694967f7ae5f
