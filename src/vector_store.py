@@ -26,6 +26,12 @@ class _DeterministicSet(set):
         return (type(self), (tuple(sorted(self, key=repr)),))
 
 
+def _probe_log(message: str) -> None:
+    """Emit FAISS load boundary evidence through logger and stdout."""
+    logger.info(message)
+    print(f"STARTUP_PROBE: {message}", flush=True)
+
+
 class VectorStoreManager:
     """Manage FAISS indexes without loading unverified pickle artifacts."""
 
@@ -114,31 +120,46 @@ class VectorStoreManager:
         dangerous deserialization is enabled only after the expected hash is
         supplied out-of-band via FAISS_INDEX_PKL_SHA256.
         """
+        _probe_log("vector store load entered")
         path = Path(path)
         pickle_path = path / "index.pkl"
         index_path = path / "index.faiss"
+        _probe_log("vector store paths resolved")
 
         if not pickle_path.is_file() or not index_path.is_file():
             raise FileNotFoundError(
                 f"FAISS index is incomplete: expected {index_path} and {pickle_path}"
             )
+        _probe_log("FAISS artifact files validated")
 
         expected = os.getenv("FAISS_INDEX_PKL_SHA256", "").strip().lower()
         if not expected or len(expected) != 64:
             raise RuntimeError(
                 "FAISS_INDEX_PKL_SHA256 must be configured before loading a local FAISS index."
             )
+        _probe_log("FAISS trusted hash configuration validated")
 
+        _probe_log("FAISS index.pkl SHA-256 calculation starting")
         actual = self._sha256(pickle_path)
+        _probe_log("FAISS index.pkl SHA-256 calculation completed")
+
         if actual != expected:
             raise RuntimeError("FAISS index integrity check failed; refusing deserialization.")
+        _probe_log("FAISS trusted hash comparison passed")
 
+        _probe_log("FAISS embedding model retrieval starting")
+        embedding_model = embedding_manager.get_embedding_model()
+        _probe_log("FAISS embedding model retrieval completed")
+
+        _probe_log("FAISS.load_local starting")
         self.vector_store = FAISS.load_local(
             str(path),
-            embedding_manager.get_embedding_model(),
+            embedding_model,
             allow_dangerous_deserialization=True,
         )
+        _probe_log("FAISS.load_local completed")
         logger.info("Verified FAISS vector store loaded from %s", path)
+        _probe_log("vector store load completed")
         return self.vector_store
 
     def add_documents(self, documents: list[Document]):
