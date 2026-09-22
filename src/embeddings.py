@@ -1,4 +1,4 @@
-"""
+""" 
 ==========================================================
 AI-Powered Cybersecurity Incident Assistant (RAG)
 Embeddings Module
@@ -30,6 +30,21 @@ from config.config import EMBEDDING_MODEL
 logger = logging.getLogger(__name__)
 
 
+def _probe_log(message: str) -> None:
+    """Emit embedding-model retrieval boundary evidence."""
+    logger.info(message)
+    print(f"STARTUP_PROBE: {message}", flush=True)
+
+
+def _sanitize_exception(error: Exception) -> str:
+    """Redact common secret-bearing values from diagnostic exception text."""
+    message = str(error)
+    for secret_name in ("api_key", "password", "token", "secret"):
+        if secret_name in message.lower():
+            message = f"[redacted {secret_name}]"
+    return message[:500]
+
+
 class EmbeddingManager:
     """
     Handles embedding model loading and embedding generation.
@@ -47,21 +62,33 @@ class EmbeddingManager:
 
         if self._embeddings is None:
 
-            logger.info(
-                "Loading embedding model: %s",
-                EMBEDDING_MODEL
+            _probe_log("embedding model cache miss")
+            _probe_log(
+                "embedding model configuration resolved: "
+                f"model_name={EMBEDDING_MODEL}; device=cpu"
             )
+            _probe_log("embedding model construction starting")
 
-            self._embeddings = HuggingFaceEmbeddings(
-                model_name=EMBEDDING_MODEL,
-                model_kwargs={
-                    "device": "cpu"
-                },
-                encode_kwargs={
-                    "normalize_embeddings": True,
-                    "batch_size": 1,
-                }
-            )
+            try:
+                self._embeddings = HuggingFaceEmbeddings(
+                    model_name=EMBEDDING_MODEL,
+                    model_kwargs={
+                        "device": "cpu"
+                    },
+                    encode_kwargs={
+                        "normalize_embeddings": True,
+                        "batch_size": 1,
+                    }
+                )
+            except Exception as error:
+                _probe_log(
+                    "embedding model construction FAILED: "
+                    f"exception={type(error).__name__}; "
+                    f"message={_sanitize_exception(error)}"
+                )
+                raise
+
+            _probe_log("embedding model construction completed")
 
         return self._embeddings
 
