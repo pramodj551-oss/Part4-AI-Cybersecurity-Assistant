@@ -32,6 +32,15 @@ def _probe_log(message: str) -> None:
     print(f"STARTUP_PROBE: {message}", flush=True)
 
 
+def _sanitize_exception(error: Exception) -> str:
+    """Redact common secret-bearing values from diagnostic exception text."""
+    message = str(error)
+    for secret_name in ("api_key", "password", "token", "secret"):
+        if secret_name in message.lower():
+            message = f"[redacted {secret_name}]"
+    return message[:500]
+
+
 class VectorStoreManager:
     """Manage FAISS indexes without loading unverified pickle artifacts."""
 
@@ -148,7 +157,15 @@ class VectorStoreManager:
         _probe_log("FAISS trusted hash comparison passed")
 
         _probe_log("FAISS embedding model retrieval starting")
-        embedding_model = embedding_manager.get_embedding_model()
+        try:
+            embedding_model = embedding_manager.get_embedding_model()
+        except Exception as error:
+            diagnostic = _sanitize_exception(error)
+            _probe_log(
+                "FAISS embedding model retrieval FAILED: "
+                f"exception={type(error).__name__}; message={diagnostic}"
+            )
+            raise
         _probe_log("FAISS embedding model retrieval completed")
 
         _probe_log("FAISS.load_local starting")
