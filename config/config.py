@@ -1,7 +1,6 @@
 """Application configuration for the cybersecurity RAG assistant."""
 
 from pathlib import Path
-import os
 
 from dotenv import load_dotenv
 
@@ -42,9 +41,9 @@ _default_api_base = (
     if LLM_PROVIDER == "groq"
     else "http://localhost:11434/v1"
 )
-API_BASE_URL = os.getenv(
+API_BASE_URL = get_setting(
     "API_BASE_URL",
-    os.getenv("OLLAMA_API_BASE", _default_api_base),
+    get_setting("OLLAMA_API_BASE", _default_api_base),
 ).rstrip("/")
 
 TEMPERATURE = float(get_setting("TEMPERATURE", "0.2"))
