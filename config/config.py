@@ -5,6 +5,8 @@ import os
 
 from dotenv import load_dotenv
 
+from src.runtime_config import get_setting
+
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,18 +25,18 @@ SOP_DOCUMENTS_DIR = DATA_DIR / "sop_documents"
 
 VECTOR_INDEX_PATH = VECTORSTORE_DIR / "faiss_index"
 
-APP_ENVIRONMENT = os.getenv("APP_ENVIRONMENT", "development").strip().lower()
+APP_ENVIRONMENT = get_setting("APP_ENVIRONMENT", "development").lower()
 
-EMBEDDING_MODEL = os.getenv(
+EMBEDDING_MODEL = get_setting(
     "EMBEDDING_MODEL",
     "sentence-transformers/all-MiniLM-L6-v2",
 )
 
 # Local Ollama remains the development default. Production may use the
 # OpenAI-compatible Groq endpoint when LLM_PROVIDER=groq.
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
-LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "llama2")).strip()
-API_KEY = os.getenv("API_KEY", os.getenv("GROQ_API_KEY", "ollama")).strip()
+LLM_PROVIDER = get_setting("LLM_PROVIDER", "ollama").lower()
+LLM_MODEL = get_setting("LLM_MODEL", get_setting("OLLAMA_MODEL", "llama2"))
+API_KEY = get_setting("API_KEY", get_setting("GROQ_API_KEY", "ollama"))
 _default_api_base = (
     "https://api.groq.com/openai/v1"
     if LLM_PROVIDER == "groq"
@@ -45,15 +47,15 @@ API_BASE_URL = os.getenv(
     os.getenv("OLLAMA_API_BASE", _default_api_base),
 ).rstrip("/")
 
-TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1024"))
+TEMPERATURE = float(get_setting("TEMPERATURE", "0.2"))
+MAX_TOKENS = int(get_setting("MAX_TOKENS", "1024"))
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 TOP_K = 5
 SEARCH_TYPE = "similarity"
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL = get_setting("LOG_LEVEL", "INFO").upper()
 LOG_FILE = LOG_DIR / "rag_assistant.log"
 
 APP_TITLE = "AI-Powered Cybersecurity Incident Assistant"
@@ -67,8 +69,8 @@ def validate_production_config() -> None:
         return
 
     required = {
-        "AUTH_USERNAME": os.getenv("AUTH_USERNAME", "").strip(),
-        "AUTH_PASSWORD_HASH": os.getenv("AUTH_PASSWORD_HASH", "").strip(),
+        "AUTH_USERNAME": get_setting("AUTH_USERNAME"),
+        "AUTH_PASSWORD_HASH": get_setting("AUTH_PASSWORD_HASH"),
         "API_KEY": API_KEY,
         "LLM_PROVIDER": LLM_PROVIDER,
         "LLM_MODEL": LLM_MODEL,
@@ -87,7 +89,7 @@ def validate_production_config() -> None:
         insecure_defaults.append("LLM_MODEL")
     if API_BASE_URL.lower().startswith(("http://localhost", "http://127.0.0.1", "http://0.0.0.0")):
         insecure_defaults.append("API_BASE_URL")
-    if not os.getenv("AUTH_PASSWORD_HASH", "").strip().startswith("pbkdf2_sha256$"):
+    if not get_setting("AUTH_PASSWORD_HASH").startswith("pbkdf2_sha256$"):
         insecure_defaults.append("AUTH_PASSWORD_HASH")
 
     if insecure_defaults:
@@ -99,5 +101,3 @@ def validate_production_config() -> None:
 
 for directory in (MODEL_DIR, VECTORSTORE_DIR, LOG_DIR):
     directory.mkdir(parents=True, exist_ok=True)
-
-validate_production_config()
