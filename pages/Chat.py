@@ -4,7 +4,7 @@ import streamlit as st
 
 from config.config import APP_ICON
 from src.auth import render_logout, require_auth
-from src.startup import check_startup
+from src.startup import initialize_vector_store
 from src.rag_pipeline import rag_pipeline
 
 st.set_page_config(
@@ -13,13 +13,9 @@ st.set_page_config(
     layout="wide",
 )
 
-# Streamlit multipage navigation can execute this page directly. Therefore the
-# Chat entrypoint must enforce the same verified production startup gate as the
-# home page before exposing the RAG pipeline.
-if not check_startup():
-    st.error("The assistant is not ready: required startup dependencies are unavailable.")
-    st.stop()
-
+# Authentication is deliberately evaluated before FAISS/embedding initialization.
+# The heavy production vector-store startup is deferred until the first chat
+# request so the Chat page and Sign in form remain responsive.
 require_auth()
 render_logout()
 
@@ -54,6 +50,9 @@ if question:
     with st.chat_message("assistant"):
         with st.spinner("Retrieving relevant context and generating response..."):
             try:
+                with st.spinner("Preparing the verified cybersecurity knowledge base..."):
+                    if not initialize_vector_store():
+                        raise RuntimeError("Production startup checks failed; the assistant is not ready.")
                 result = rag_pipeline.answer(question)
                 answer = result.get("answer") or "No answer was generated."
                 sources = result.get("sources", [])
