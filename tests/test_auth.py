@@ -68,3 +68,25 @@ def test_role_authorization_is_based_on_authenticated_session(monkeypatch):
 
     assert auth.current_role() == "analyst"
     assert "admin" != auth.current_role()
+
+
+def test_authenticate_accepts_streamlit_secret_values(monkeypatch):
+    encoded = auth.hash_password(
+        "streamlit-secret-password",
+        salt="00112233445566778899aabbccddeeff",
+        iterations=100_000,
+    )
+    monkeypatch.delenv("AUTH_USERNAME", raising=False)
+    monkeypatch.delenv("AUTH_PASSWORD_HASH", raising=False)
+    monkeypatch.setattr(
+        auth.st,
+        "secrets",
+        {
+            "AUTH_USERNAME": "analyst",
+            "AUTH_PASSWORD_HASH": encoded,
+        },
+        raising=False,
+    )
+
+    assert auth.authenticate("analyst", "streamlit-secret-password")
+    assert not auth.authenticate("analyst", "wrong-password")
