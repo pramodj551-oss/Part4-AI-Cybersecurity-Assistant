@@ -32,9 +32,10 @@ def test_production_rejects_missing_required_configuration(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
     import config.config as config
+    config = importlib.reload(config)
 
     with pytest.raises(RuntimeError, match="Production configuration is incomplete"):
-        importlib.reload(config)
+        config.validate_production_config()
 
 
 def test_production_rejects_insecure_defaults(monkeypatch):
@@ -50,9 +51,10 @@ def test_production_rejects_insecure_defaults(monkeypatch):
     monkeypatch.setenv("API_BASE_URL", "http://localhost:11434/v1")
 
     import config.config as config
+    config = importlib.reload(config)
 
     with pytest.raises(RuntimeError, match="insecure/default values"):
-        importlib.reload(config)
+        config.validate_production_config()
 
 
 def test_production_accepts_explicit_non_default_configuration(monkeypatch):
@@ -68,8 +70,8 @@ def test_production_accepts_explicit_non_default_configuration(monkeypatch):
     monkeypatch.setenv("API_BASE_URL", "https://llm.internal.example/v1")
 
     import config.config as config
-
     config = importlib.reload(config)
+    config.validate_production_config()
     assert config.APP_ENVIRONMENT == "production"
     assert config.LLM_MODEL == "production-model"
     assert config.API_BASE_URL == "https://llm.internal.example/v1"
