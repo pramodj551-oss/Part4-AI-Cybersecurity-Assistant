@@ -18,6 +18,7 @@ def test_startup_initializes_vector_store(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "src.vector_store", _fake_vector_store(fake_load))
     monkeypatch.setattr(startup, "check_runtime_dependencies", lambda: True)
+    monkeypatch.setattr(startup, "validate_production_config", lambda: None)
     monkeypatch.setattr(startup, "_vector_store_initialized", False)
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
 
@@ -32,6 +33,7 @@ def test_startup_fails_when_faiss_initialization_fails(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "src.vector_store", _fake_vector_store(fake_load))
     monkeypatch.setattr(startup, "check_runtime_dependencies", lambda: True)
+    monkeypatch.setattr(startup, "validate_production_config", lambda: None)
     monkeypatch.setattr(startup, "_vector_store_initialized", False)
     monkeypatch.setenv("APP_ENVIRONMENT", "production")
 
