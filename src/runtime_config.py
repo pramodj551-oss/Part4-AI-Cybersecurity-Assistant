@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from collections.abc import Mapping
 
 
 def get_setting(name: str, default: str = "") -> str:
@@ -41,7 +41,7 @@ def get_setting(name: str, default: str = "") -> str:
         }.get(name)
         if section_name:
             section = st.secrets.get(section_name)
-            if isinstance(section, dict):
+            if isinstance(section, Mapping):
                 value = section.get(name)
                 if value is None:
                     short_name = name.removeprefix("AUTH_").removeprefix("LLM_")
