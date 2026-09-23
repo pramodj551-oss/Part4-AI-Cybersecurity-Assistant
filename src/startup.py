@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-import os
 import re
+
+from config.config import APP_ENVIRONMENT, validate_production_config
+from src.runtime_config import get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -99,12 +101,21 @@ def check_startup() -> bool:
         _probe_log("check_startup result=False; runtime dependency validation failed")
         return False
 
-    environment = os.getenv("APP_ENVIRONMENT", "development").strip().lower()
+    environment = get_setting("APP_ENVIRONMENT", APP_ENVIRONMENT).lower()
     _probe_log(f"APP_ENVIRONMENT={environment}")
 
     if environment not in {"production", "prod"}:
         _probe_log("check_startup result=True; non-production environment")
         return True
+
+    try:
+        validate_production_config()
+    except Exception as error:
+        _probe_log(
+            "check_startup result=False; production configuration invalid: "
+            f"exception={type(error).__name__}; message={_sanitize_exception(error)}"
+        )
+        return False
 
     result = initialize_vector_store()
     _probe_log(f"check_startup result={result}")

@@ -31,11 +31,11 @@ Production integrity boundary:
 
 ## Production / Go-Live evidence
 
-**Status: Production Ready / Go-Live evidence complete.**
+**Status: Production hardening in progress.**
 
 - Production service: `https://part4-ai-cybersecurity-api.onrender.com`
-- Production health probe: `/_stcore/health` → HTTP 200 with healthy response.
-- Authenticated controlled RAG smoke: successful answer with Sources; no secret/credential leakage observed.
+- Render deployment and CI evidence exist, but live authentication/page-startup behavior must be revalidated after the current auth/startup remediation.
+- Production claims are not considered closed until authenticated Render and Streamlit smoke tests pass after redeployment.
 - MEM-OPS-01: runtime memory-footprint mitigation merged and production stability smoke completed.
 - PRA-01: Production Readiness audit completed.
 - PRA-02: Operational contracts completed.
@@ -133,6 +133,14 @@ Store the generated value as `AUTH_PASSWORD_HASH` in your local `.env` file. Use
 For the deployed application, configure production secrets only in the Render service environment/secret settings.
 
 Do **not** put the production password, password hash, API keys, or other credentials in GitHub source files, README, issue comments, or screenshots.
+
+### Streamlit deployment
+
+Render and Streamlit now use the same configuration key names. The application reads environment variables first and Streamlit Secrets second, so the same PBKDF2 AUTH_PASSWORD_HASH can be configured independently in both deployment secret stores without exposing the password in Git.
+
+Configure the same AUTH_USERNAME and AUTH_PASSWORD_HASH values in the Streamlit Secrets store that are configured in Render. Also configure the production LLM and FAISS_INDEX_PKL_SHA256 values there. Flat secret names are supported; conventional [auth] and [llm] sections are also accepted.
+
+The application no longer performs FAISS/embedding initialization before the sign-in page. The home page stays lightweight, and the heavy verified vector-store initialization is deferred until the first authenticated Chat request.
 
 ## Persisted FAISS index security
 

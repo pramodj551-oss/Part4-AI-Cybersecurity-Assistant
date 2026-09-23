@@ -12,7 +12,6 @@ import streamlit as st
 
 from config.config import APP_ICON, APP_TITLE
 from src.auth import render_logout, require_auth
-from src.startup import check_startup
 
 
 # ----------------------------------------------------------
@@ -27,16 +26,10 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------------
-# Startup Gate
-# ----------------------------------------------------------
-
-if not check_startup():
-    st.error("The assistant is not ready: required startup dependencies are unavailable.")
-    st.stop()
-
-# ----------------------------------------------------------
 # Authentication Gate
 # ----------------------------------------------------------
+# Authentication must render before any heavyweight RAG/FAISS initialization.
+# This keeps the public sign-in entry point responsive on constrained hosts.
 
 require_auth()
 render_logout()

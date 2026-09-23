@@ -25,8 +25,7 @@ def _load_config(monkeypatch, **env):
         monkeypatch.setenv(key, value)
 
     sys.modules.pop(MODULE_NAME, None)
-    config = importlib.import_module(MODULE_NAME)
-    return config
+    return importlib.import_module(MODULE_NAME)
 
 
 def test_production_config_accepts_explicit_groq_runtime(monkeypatch):
@@ -40,15 +39,18 @@ def test_production_config_accepts_explicit_groq_runtime(monkeypatch):
 
 
 def test_production_config_rejects_localhost_runtime(monkeypatch):
+    config = _load_config(monkeypatch, API_BASE_URL="http://localhost:11434/v1")
     with pytest.raises(RuntimeError, match="API_BASE_URL"):
-        _load_config(monkeypatch, API_BASE_URL="http://localhost:11434/v1")
+        config.validate_production_config()
 
 
 def test_production_config_rejects_default_llm_model(monkeypatch):
+    config = _load_config(monkeypatch, LLM_MODEL="llama2")
     with pytest.raises(RuntimeError, match="LLM_MODEL"):
-        _load_config(monkeypatch, LLM_MODEL="llama2")
+        config.validate_production_config()
 
 
 def test_production_config_rejects_default_api_key(monkeypatch):
+    config = _load_config(monkeypatch, API_KEY="ollama")
     with pytest.raises(RuntimeError, match="API_KEY"):
-        _load_config(monkeypatch, API_KEY="ollama")
+        config.validate_production_config()
