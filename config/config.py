@@ -100,3 +100,5 @@ def validate_production_config() -> None:
 
 for directory in (MODEL_DIR, VECTORSTORE_DIR, LOG_DIR):
     directory.mkdir(parents=True, exist_ok=True)
+
+validate_production_config()
