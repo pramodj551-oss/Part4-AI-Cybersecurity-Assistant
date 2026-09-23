@@ -10,14 +10,16 @@ import time
 
 import streamlit as st
 
+from src.runtime_config import get_setting
 
-PBKDF2_ITERATIONS = int(os.getenv("AUTH_PBKDF2_ITERATIONS", "600000"))
-SESSION_TTL_SECONDS = int(os.getenv("AUTH_SESSION_TTL_SECONDS", "3600"))
+
+PBKDF2_ITERATIONS = int(get_setting("AUTH_PBKDF2_ITERATIONS", "600000"))
+SESSION_TTL_SECONDS = int(get_setting("AUTH_SESSION_TTL_SECONDS", "3600"))
 
 
 def _credentials() -> tuple[str, str]:
-    username = os.getenv("AUTH_USERNAME", "").strip()
-    password_hash = os.getenv("AUTH_PASSWORD_HASH", "").strip()
+    username = get_setting("AUTH_USERNAME")
+    password_hash = get_setting("AUTH_PASSWORD_HASH")
     if not username or not password_hash:
         raise RuntimeError("Authentication is not configured.")
     return username, password_hash
@@ -104,7 +106,7 @@ def login() -> None:
         if valid:
             st.session_state.authenticated = True
             st.session_state.auth_user = username.strip()
-            st.session_state.auth_role = os.getenv("AUTH_ROLE", "analyst").strip().lower() or "analyst"
+            st.session_state.auth_role = get_setting("AUTH_ROLE", "analyst").lower() or "analyst"
             st.session_state.auth_expires_at = time.time() + SESSION_TTL_SECONDS
             st.rerun()
 
