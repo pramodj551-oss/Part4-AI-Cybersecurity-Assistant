@@ -73,7 +73,8 @@ def test_compose_part4_uses_built_artifact_and_valid_runtime_contract():
     assert "OLLAMA_API_BASE=http://ollama:11434/v1" in compose
     assert "API_BASE_URL=http://ollama:11434/v1" in compose
     assert 'test: ["CMD", "python", "scripts/healthcheck.py", "--health", "--port", "8502"]' in compose
-    assert "./.streamlit:/home/app/.streamlit" in compose
+    assert "./.streamlit:/home/app/.streamlit:ro" in compose
+    assert "./vectorstore:/vectorstore" not in compose
 
 
 def _production_config_import(name, *args, **kwargs):
