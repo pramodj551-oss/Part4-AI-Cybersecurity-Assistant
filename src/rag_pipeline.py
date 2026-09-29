@@ -7,6 +7,7 @@ import time
 
 from src.concurrency import RAGConcurrencyGuard
 from src.llm import llm_manager
+from src.observability import get_request_id, reset_request_id, set_request_id
 from src.prompt_builder import prompt_builder
 from src.retriever import retriever_manager
 
@@ -27,11 +28,12 @@ class RAGPipeline:
         # Only the expensive retrieval/LLM path is guarded. Health/readiness
         # endpoints and lightweight application startup checks are unaffected.
         with self.concurrency_guard:
+            request_token = set_request_id(request_id)
             pipeline_started = time.monotonic()
-            logger.info("RAG_PROBE request_start request_id=%s", request_id or "none")
+            logger.info("RAG_PROBE request_start request_id=%s", get_request_id())
             retrieval_started = time.monotonic()
-            logger.info("RAG_PROBE retrieval_start request_id=%s", request_id or "none")
-            documents = retriever_manager.retrieve(question, request_id=request_id)
+            logger.info("RAG_PROBE retrieval_start request_id=%s", get_request_id())
+            documents = retriever_manager.retrieve(question)
             logger.info(
                 "RAG_PROBE retrieval_done request_id=%s documents=%d elapsed_ms=%d",
                 request_id or "none",
@@ -50,7 +52,6 @@ class RAGPipeline:
             llm_response = llm_manager.generate(
                 prompt,
                 system_prompt=prompt_builder.system_prompt,
-                request_id=request_id,
             )
             logger.info(
                 "RAG_PROBE llm_done request_id=%s elapsed_ms=%d",
@@ -59,9 +60,10 @@ class RAGPipeline:
             )
             logger.info(
                 "RAG_PROBE request_done request_id=%s elapsed_ms=%d",
-                request_id or "none",
+                get_request_id(),
                 int((time.monotonic() - pipeline_started) * 1000),
             )
+            reset_request_id(request_token)
 
         return {
             "question": question,
