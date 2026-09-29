@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import pickle
+import time
 from pathlib import Path
 
 from langchain_community.docstore.in_memory import InMemoryDocstore
@@ -130,6 +131,7 @@ class VectorStoreManager:
         supplied out-of-band via FAISS_INDEX_PKL_SHA256.
         """
         _probe_log("vector store load entered")
+        load_started = time.monotonic()
         path = Path(path)
         pickle_path = path / "index.pkl"
         index_path = path / "index.faiss"
@@ -169,14 +171,21 @@ class VectorStoreManager:
         _probe_log("FAISS embedding model retrieval completed")
 
         _probe_log("FAISS.load_local starting")
+        faiss_started = time.monotonic()
         self.vector_store = FAISS.load_local(
             str(path),
             embedding_model,
             allow_dangerous_deserialization=True,
         )
-        _probe_log("FAISS.load_local completed")
+        _probe_log(
+            "FAISS.load_local completed; "
+            f"elapsed_ms={int((time.monotonic() - faiss_started) * 1000)}"
+        )
         logger.info("Verified FAISS vector store loaded from %s", path)
-        _probe_log("vector store load completed")
+        _probe_log(
+            "vector store load completed; "
+            f"total_elapsed_ms={int((time.monotonic() - load_started) * 1000)}"
+        )
         return self.vector_store
 
     def add_documents(self, documents: list[Document]):
