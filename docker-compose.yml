@@ -125,7 +125,7 @@ services:
       - shared_data:/data
       - shared_models:/models
       - dashboard_logs:/logs
-      - ./config/.streamlit:/root/.streamlit
+      - ./.streamlit:/home/app/.streamlit
     
     ports:
       - "8501:8501"  # Streamlit dashboard
@@ -200,7 +200,7 @@ services:
         condition: service_healthy
     
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8502/_stcore/health"]
+      test: ["CMD", "python", "scripts/healthcheck.py", "--health", "--port", "8502"]
       interval: 30s
       timeout: 10s
       retries: 3
