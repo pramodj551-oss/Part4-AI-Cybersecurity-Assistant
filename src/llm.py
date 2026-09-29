@@ -48,7 +48,8 @@ class LLMManager:
         messages.append({"role": "user", "content": prompt})
 
         request_started = time.monotonic()
-        logger.info("LLM_PROBE request_start request_id=%s", get_request_id())
+        request_id = get_request_id()
+        logger.info("LLM_PROBE request_start request_id=%s", request_id)
 
         for attempt in range(LLM_MAX_ATTEMPTS):
             attempt_started = time.monotonic()
