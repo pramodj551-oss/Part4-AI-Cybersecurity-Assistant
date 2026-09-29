@@ -8,6 +8,7 @@ import streamlit as st
 from config.config import APP_ICON
 from src.auth import render_logout, require_auth
 from src.startup import initialize_vector_store
+from src.observability import reset_request_id, set_request_id
 
 st.set_page_config(
     page_title="Chat",
@@ -68,7 +69,9 @@ if question:
 
                 print(f"CHAT_PROBE: rag_request_start request_id={request_id}", flush=True)
                 rag_started = time.monotonic()
-                result = rag_pipeline.answer(question, request_id=request_id)
+                request_token = set_request_id(request_id)
+                result = rag_pipeline.answer(question)
+                reset_request_id(request_token)
                 print(f"CHAT_PROBE: rag_request_done request_id={request_id} elapsed_ms={int((time.monotonic()-rag_started)*1000)}", flush=True)
                 answer = result.get("answer") or "No answer was generated."
                 sources = result.get("sources", [])
