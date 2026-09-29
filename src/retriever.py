@@ -53,7 +53,8 @@ class RetrieverManager:
             )
 
         retrieval_started = time.monotonic()
-        logger.info("RETRIEVAL_PROBE start request_id=%s", get_request_id())
+        request_id = get_request_id()
+        logger.info("RETRIEVAL_PROBE start request_id=%s", request_id)
 
         retriever = (
             vector_store_manager.as_retriever(
