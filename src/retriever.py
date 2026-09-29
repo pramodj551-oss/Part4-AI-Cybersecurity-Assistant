@@ -11,6 +11,7 @@ Retrieves the most relevant documents from the vector store.
 from __future__ import annotations
 
 import logging
+import time
 
 from config.config import (
     SEARCH_TYPE,
@@ -38,7 +39,8 @@ class RetrieverManager:
 
     def retrieve(
         self,
-        query: str
+        query: str,
+        request_id: str | None = None,
     ):
         """
         Retrieve relevant documents.
@@ -50,6 +52,9 @@ class RetrieverManager:
                 "Query cannot be empty."
             )
 
+        retrieval_started = time.monotonic()
+        logger.info("RETRIEVAL_PROBE start request_id=%s", request_id or "none")
+
         retriever = (
             vector_store_manager.as_retriever(
                 search_type=self.search_type,
@@ -60,8 +65,10 @@ class RetrieverManager:
         documents = retriever.invoke(query)
 
         logger.info(
-            "Retrieved %s documents.",
-            len(documents)
+            "RETRIEVAL_PROBE done request_id=%s documents=%d elapsed_ms=%d",
+            request_id or "none",
+            len(documents),
+            int((time.monotonic() - retrieval_started) * 1000),
         )
 
         return documents
