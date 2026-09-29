@@ -11,7 +11,9 @@ def test_chat_page_authenticates_before_heavy_rag_startup():
     assert "require_auth()" in source
     assert "if not initialize_vector_store():" in source
     assert source.index("require_auth()") < source.index("if not initialize_vector_store():")
-    assert source.index("if not initialize_vector_store():") < source.index("result = rag_pipeline.answer(question)")
+    assert source.index("if not initialize_vector_store():") < source.index("from src.rag_pipeline import rag_pipeline")
+    assert source.index("from src.rag_pipeline import rag_pipeline") < source.index("result = rag_pipeline.answer(question)")
+    assert source.index("require_auth()") < source.index("from src.rag_pipeline import rag_pipeline")
 
 
 def test_chat_page_defers_vector_store_initialization_until_question():

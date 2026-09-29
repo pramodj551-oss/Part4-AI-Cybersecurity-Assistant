@@ -125,7 +125,7 @@ services:
       - shared_data:/data
       - shared_models:/models
       - dashboard_logs:/logs
-      - ./config/.streamlit:/root/.streamlit
+      - ./.streamlit:/home/app/.streamlit
     
     ports:
       - "8501:8501"  # Streamlit dashboard
@@ -166,8 +166,13 @@ services:
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
       - DATA_PATH=/data
       - MODEL_PATH=/models
-      - VECTORSTORE_PATH=/vectorstore
-      - OLLAMA_API_BASE=http://ollama:11434
+      - VECTORSTORE_PATH=/app/vectorstore
+      - OLLAMA_API_BASE=http://ollama:11434/v1
+      - API_BASE_URL=http://ollama:11434/v1
+      - API_KEY=ollama
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=llama2
+      - FAISS_INDEX_PKL_SHA256=590424fb3526de38d2d5ae836f930adc747a981567d4e4b7df80694967f7ae5f
       - LOG_LEVEL=INFO
     
     volumes:
@@ -195,7 +200,7 @@ services:
         condition: service_healthy
     
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8502/_stcore/health"]
+      test: ["CMD", "python", "scripts/healthcheck.py", "--health", "--port", "8502"]
       interval: 30s
       timeout: 10s
       retries: 3
