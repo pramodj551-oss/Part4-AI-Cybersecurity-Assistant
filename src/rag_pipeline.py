@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from src.concurrency import RAGConcurrencyGuard
 from src.llm import llm_manager
+from src.observability import get_request_id, reset_request_id, set_request_id
 from src.prompt_builder import prompt_builder
 from src.retriever import retriever_manager
 
@@ -18,7 +20,7 @@ class RAGPipeline:
     def __init__(self, concurrency_guard: RAGConcurrencyGuard | None = None) -> None:
         self.concurrency_guard = concurrency_guard or RAGConcurrencyGuard()
 
-    def answer(self, question: str) -> dict:
+    def answer(self, question: str, request_id: str | None = None) -> dict:
         question = question.strip()
         if not question:
             raise ValueError("Question cannot be empty.")
@@ -26,12 +28,43 @@ class RAGPipeline:
         # Only the expensive retrieval/LLM path is guarded. Health/readiness
         # endpoints and lightweight application startup checks are unaffected.
         with self.concurrency_guard:
+            effective_request_id = request_id or get_request_id()
+            request_token = set_request_id(effective_request_id)
+            pipeline_started = time.monotonic()
+            logger.info("RAG_PROBE request_start request_id=%s", get_request_id())
+            retrieval_started = time.monotonic()
+            logger.info("RAG_PROBE retrieval_start request_id=%s", get_request_id())
             documents = retriever_manager.retrieve(question)
+            logger.info(
+                "RAG_PROBE retrieval_done request_id=%s documents=%d elapsed_ms=%d",
+                get_request_id(),
+                len(documents),
+                int((time.monotonic() - retrieval_started) * 1000),
+            )
+            prompt_started = time.monotonic()
             prompt = prompt_builder.build_prompt(question, documents)
+            logger.info(
+                "RAG_PROBE prompt_done request_id=%s elapsed_ms=%d",
+                request_id or "none",
+                int((time.monotonic() - prompt_started) * 1000),
+            )
+            llm_started = time.monotonic()
+            logger.info("RAG_PROBE llm_start request_id=%s", request_id or "none")
             llm_response = llm_manager.generate(
                 prompt,
                 system_prompt=prompt_builder.system_prompt,
             )
+            logger.info(
+                "RAG_PROBE llm_done request_id=%s elapsed_ms=%d",
+                request_id or "none",
+                int((time.monotonic() - llm_started) * 1000),
+            )
+            logger.info(
+                "RAG_PROBE request_done request_id=%s elapsed_ms=%d",
+                get_request_id(),
+                int((time.monotonic() - pipeline_started) * 1000),
+            )
+            reset_request_id(request_token)
 
         return {
             "question": question,
