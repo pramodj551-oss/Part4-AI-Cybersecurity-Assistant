@@ -1,5 +1,8 @@
 """Interactive cybersecurity RAG chat page."""
 
+import time
+import uuid
+
 import streamlit as st
 
 from config.config import APP_ICON
@@ -42,6 +45,9 @@ for message in st.session_state.chat_messages:
 question = st.chat_input("Ask a cybersecurity question...")
 
 if question:
+    request_id = uuid.uuid4().hex[:12]
+    request_started = time.monotonic()
+    print(f"CHAT_PROBE: request_start request_id={request_id}", flush=True)
     st.session_state.chat_messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.markdown(question)
@@ -50,20 +56,28 @@ if question:
         with st.spinner("Retrieving relevant context and generating response..."):
             try:
                 with st.spinner("Preparing the verified cybersecurity knowledge base..."):
+                    print(f"CHAT_PROBE: startup_initialization_start request_id={request_id}", flush=True)
+                    startup_started = time.monotonic()
                     if not initialize_vector_store():
                         raise RuntimeError("Production startup checks failed; the assistant is not ready.")
+                    print(f"CHAT_PROBE: startup_initialization_done request_id={request_id} elapsed_ms={int((time.monotonic()-startup_started)*1000)}", flush=True)
 
                 # Import only after authentication and verified vector-store initialization.
                 # src.llm constructs its OpenAI-compatible client at import time.
                 from src.rag_pipeline import rag_pipeline
 
-                result = rag_pipeline.answer(question)
+                print(f"CHAT_PROBE: rag_request_start request_id={request_id}", flush=True)
+                rag_started = time.monotonic()
+                result = rag_pipeline.answer(question, request_id=request_id)
+                print(f"CHAT_PROBE: rag_request_done request_id={request_id} elapsed_ms={int((time.monotonic()-rag_started)*1000)}", flush=True)
                 answer = result.get("answer") or "No answer was generated."
                 sources = result.get("sources", [])
             except (ValueError, FileNotFoundError, RuntimeError) as error:
+                print(f"CHAT_PROBE: request_error request_id={request_id} exception={type(error).__name__}", flush=True)
                 answer = f"The assistant is not ready: {error}"
                 sources = []
-            except Exception:
+            except Exception as error:
+                print(f"CHAT_PROBE: request_error request_id={request_id} exception={type(error).__name__}", flush=True)
                 answer = "The assistant could not complete the request. Check the application logs for details."
                 sources = []
 
