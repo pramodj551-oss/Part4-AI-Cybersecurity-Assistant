@@ -8,6 +8,7 @@ import time
 from openai import OpenAI
 
 from config.config import API_BASE_URL, API_KEY, LLM_MODEL, MAX_TOKENS, TEMPERATURE
+from src.observability import get_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class LLMManager:
     def _is_retryable(exc: Exception) -> bool:
         return exc.__class__.__name__ in _RETRYABLE_ERROR_NAMES
 
-    def generate(self, prompt: str, system_prompt: str | None = None, request_id: str | None = None) -> dict:
+    def generate(self, prompt: str, system_prompt: str | None = None) -> dict:
         if not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
 
@@ -47,7 +48,7 @@ class LLMManager:
         messages.append({"role": "user", "content": prompt})
 
         request_started = time.monotonic()
-        logger.info("LLM_PROBE request_start request_id=%s", request_id or "none")
+        logger.info("LLM_PROBE request_start request_id=%s", get_request_id())
 
         for attempt in range(LLM_MAX_ATTEMPTS):
             attempt_started = time.monotonic()
