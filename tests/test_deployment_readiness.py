@@ -67,6 +67,14 @@ def test_dockerfile_declares_secure_runtime_contract():
     assert "--server.port=${PORT:-8502}" in dockerfile
     assert "pip install --no-cache-dir --require-hashes -r requirements.txt" in dockerfile
 
+def test_compose_part4_uses_built_artifact_and_valid_runtime_contract():
+    compose = Path("docker-compose.yml").read_text()
+    assert "FAISS_INDEX_PKL_SHA256=590424fb3526de38d2d5ae836f930adc747a981567d4e4b7df80694967f7ae5f" in compose
+    assert "OLLAMA_API_BASE=http://ollama:11434/v1" in compose
+    assert "API_BASE_URL=http://ollama:11434/v1" in compose
+    assert 'test: ["CMD", "python", "scripts/healthcheck.py", "--health", "--port", "8502"]' in compose
+    assert "./.streamlit:/home/app/.streamlit" in compose
+
 
 def _production_config_import(name, *args, **kwargs):
     if name == "config.config":
