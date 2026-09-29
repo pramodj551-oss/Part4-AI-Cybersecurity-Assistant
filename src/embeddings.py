@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 # Keep CPU-backed transformer/tokenizer runtimes from creating unnecessary
 # thread pools on the 512 MB production instance. These variables must be set
@@ -68,6 +69,7 @@ class EmbeddingManager:
                 f"model_name={EMBEDDING_MODEL}; device=cpu"
             )
             _probe_log("embedding model construction starting")
+            construction_started = time.monotonic()
 
             try:
                 self._embeddings = HuggingFaceEmbeddings(
@@ -88,7 +90,10 @@ class EmbeddingManager:
                 )
                 raise
 
-            _probe_log("embedding model construction completed")
+            _probe_log(
+                "embedding model construction completed; "
+                f"elapsed_ms={int((time.monotonic() - construction_started) * 1000)}"
+            )
 
         return self._embeddings
 
