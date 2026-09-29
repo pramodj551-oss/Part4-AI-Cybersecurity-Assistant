@@ -18,6 +18,7 @@ from config.config import (
     TOP_K
 )
 from src.vector_store import vector_store_manager
+from src.observability import get_request_id
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,6 @@ class RetrieverManager:
     def retrieve(
         self,
         query: str,
-        request_id: str | None = None,
     ):
         """
         Retrieve relevant documents.
@@ -53,7 +53,7 @@ class RetrieverManager:
             )
 
         retrieval_started = time.monotonic()
-        logger.info("RETRIEVAL_PROBE start request_id=%s", request_id or "none")
+        logger.info("RETRIEVAL_PROBE start request_id=%s", get_request_id())
 
         retriever = (
             vector_store_manager.as_retriever(
