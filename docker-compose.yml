@@ -178,10 +178,9 @@ services:
     volumes:
       - shared_data:/data
       - shared_models:/models
-      - ./vectorstore:/vectorstore
       - ./config:/config
       - rag_logs:/logs
-      - ./config/.streamlit:/root/.streamlit
+      - ./.streamlit:/home/app/.streamlit:ro
     
     ports:
       - "8502:8502"  # Streamlit RAG assistant
