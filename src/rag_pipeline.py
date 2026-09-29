@@ -28,7 +28,8 @@ class RAGPipeline:
         # Only the expensive retrieval/LLM path is guarded. Health/readiness
         # endpoints and lightweight application startup checks are unaffected.
         with self.concurrency_guard:
-            request_token = set_request_id(request_id)
+            effective_request_id = request_id or get_request_id()
+            request_token = set_request_id(effective_request_id)
             pipeline_started = time.monotonic()
             logger.info("RAG_PROBE request_start request_id=%s", get_request_id())
             retrieval_started = time.monotonic()
@@ -36,7 +37,7 @@ class RAGPipeline:
             documents = retriever_manager.retrieve(question)
             logger.info(
                 "RAG_PROBE retrieval_done request_id=%s documents=%d elapsed_ms=%d",
-                request_id or "none",
+                get_request_id(),
                 len(documents),
                 int((time.monotonic() - retrieval_started) * 1000),
             )
