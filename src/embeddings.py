@@ -37,6 +37,38 @@ def _probe_log(message: str) -> None:
     print(f"STARTUP_PROBE: {message}", flush=True)
 
 
+def _process_memory_mib() -> tuple[float | None, float | None]:
+    """Return current RSS and peak RSS from Linux procfs, in MiB."""
+    try:
+        current_kib = None
+        peak_kib = None
+        with open("/proc/self/status", "r", encoding="utf-8") as status_file:
+            for line in status_file:
+                if line.startswith("VmRSS:"):
+                    current_kib = int(line.split()[1])
+                elif line.startswith("VmHWM:"):
+                    peak_kib = int(line.split()[1])
+
+        current_mib = current_kib / 1024 if current_kib is not None else None
+        peak_mib = peak_kib / 1024 if peak_kib is not None else None
+        return current_mib, peak_mib
+    except (OSError, ValueError, IndexError):
+        return None, None
+
+
+def _memory_probe_log(stage: str, baseline_peak_mib: float | None = None) -> None:
+    """Emit RSS/peak-RSS evidence without changing model behavior."""
+    rss_mib, peak_mib = _process_memory_mib()
+    fields = [f"stage={stage}"]
+    if rss_mib is not None:
+        fields.append(f"rss_mib={rss_mib:.1f}")
+    if peak_mib is not None:
+        fields.append(f"peak_rss_mib={peak_mib:.1f}")
+    if baseline_peak_mib is not None and peak_mib is not None:
+        fields.append(f"peak_delta_mib={peak_mib - baseline_peak_mib:.1f}")
+    _probe_log("embedding memory " + "; ".join(fields))
+
+
 def _sanitize_exception(error: Exception) -> str:
     """Redact common secret-bearing values from diagnostic exception text."""
     message = str(error)
@@ -69,6 +101,8 @@ class EmbeddingManager:
                 f"model_name={EMBEDDING_MODEL}; device=cpu"
             )
             _probe_log("embedding model construction starting")
+            _, baseline_peak_mib = _process_memory_mib()
+            _memory_probe_log("before_construction", baseline_peak_mib)
             construction_started = time.monotonic()
 
             try:
@@ -83,6 +117,7 @@ class EmbeddingManager:
                     }
                 )
             except Exception as error:
+                _memory_probe_log("construction_exception", baseline_peak_mib)
                 _probe_log(
                     "embedding model construction FAILED: "
                     f"exception={type(error).__name__}; "
@@ -90,6 +125,7 @@ class EmbeddingManager:
                 )
                 raise
 
+            _memory_probe_log("after_construction", baseline_peak_mib)
             _probe_log(
                 "embedding model construction completed; "
                 f"elapsed_ms={int((time.monotonic() - construction_started) * 1000)}"
