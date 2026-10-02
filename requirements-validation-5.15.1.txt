@@ -15,5 +15,6 @@ openai==1.60.0
 plotly==6.0.0
 joblib==1.4.2
 tqdm==4.67.1
+# Dependency-audit remediation baseline: keep candidate environment on patched pypdf.
 pypdf==6.19.0
 setuptools>=83.0.0
