@@ -69,6 +69,29 @@ jobs:
           m = re.search(r'(?ms)^multidict==6\.9\.1 \\\n(.*?)(?=^\S)', lock)
           assert m and len(re.findall(r'--hash=sha256:', m.group(1))) >= 2
           PY
+      - name: Verify minimal-policy package diff
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          def packages(text):
+              return {m.group(1).lower(): m.group(2) for m in re.finditer(r'(?m)^([A-Za-z0-9_.-]+)==([^ \\n]+)', text)}
+          current = packages(Path("requirements.txt").read_text())
+          locked = packages(Path("/tmp/requirements.lock").read_text())
+          added = sorted(set(locked) - set(current))
+          removed = sorted(set(current) - set(locked))
+          changed = sorted((k, current[k], locked[k]) for k in set(current) & set(locked) if current[k] != locked[k])
+          print("ADDED:", added)
+          print("REMOVED:", removed)
+          print("CHANGED:", changed)
+          assert not added, f"Unexpected packages added: {added}"
+          assert not removed, f"Unexpected packages removed: {removed}"
+          allowed = {("networkx", "3.6.1", "3.4.2")}
+          assert set(changed) <= allowed, f"Unrelated dependency changes detected: {changed}"
+          assert current.get("networkx") == "3.6.1" and locked.get("networkx") == "3.4.2"
+          assert current.get("multidict") == "6.9.1" and locked.get("multidict") == "6.9.1"
+          print("MINIMAL-POLICY-DIFF=PASS")
+          PY
       - name: Publish constrained authoritative lock candidate
         uses: actions/upload-artifact@v4
         with:
