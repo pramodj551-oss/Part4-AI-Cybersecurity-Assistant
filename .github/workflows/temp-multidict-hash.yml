@@ -1,0 +1,14 @@
+name: temp-multidict-hash
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get multidict wheel hash
+        run: |
+          python -m pip download --no-deps --only-binary=:all: multidict==6.9.1
+          python -m pip hash multidict-6.9.1-*.whl
