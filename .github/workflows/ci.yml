@@ -36,12 +36,66 @@ jobs:
         run: python -m pip_audit -r requirements.txt
       - name: Production FAISS reproducibility diagnostic (uncaptured)
         run: PYTHONPATH=. pytest -s -q tests/test_production_artifact_reproducibility.py
+      - name: Build current-pin constraints excluding explicit networkx pin
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          lines = Path("requirements.txt").read_text().splitlines()
+          out = []
+          skip = False
+          for line in lines:
+              if line.startswith("networkx=="):
+                  skip = True
+                  continue
+              if skip:
+                  if line.startswith("    ") or line.strip() == "":
+                      continue
+                  skip = False
+              out.append(line)
+          Path("/tmp/current-pins.txt").write_text("\n".join(out) + "\n")
+          PY
       - name: Reproducible dependency resolution check
-        run: pip-compile --quiet --generate-hashes --output-file=/tmp/requirements.lock requirements.in
-      - name: Publish generated authoritative lock candidate
+        run: |
+          pip-compile --quiet --generate-hashes             --constraint=/tmp/current-pins.txt             --output-file=/tmp/requirements.lock             requirements.in
+      - name: Validate constrained lock policy
+        run: |
+          grep -q '^networkx==3.4.2 \\' /tmp/requirements.lock
+          grep -q '^multidict==6.9.1 \\' /tmp/requirements.lock
+          test "$(grep -c '^    --hash=sha256:' /tmp/requirements.lock)" -gt 0
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          lock = Path("/tmp/requirements.lock").read_text()
+          m = re.search(r'(?ms)^multidict==6\.9\.1 \\\n(.*?)(?=^\S)', lock)
+          assert m and len(re.findall(r'--hash=sha256:', m.group(1))) >= 2
+          PY
+      - name: Verify minimal-policy package diff
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          def packages(text):
+              return {m.group(1).lower(): m.group(2) for m in re.finditer(r'(?m)^([A-Za-z0-9_.-]+)==([^ \\n]+)', text)}
+          current = packages(Path("requirements.txt").read_text())
+          locked = packages(Path("/tmp/requirements.lock").read_text())
+          added = sorted(set(locked) - set(current))
+          removed = sorted(set(current) - set(locked))
+          changed = sorted((k, current[k], locked[k]) for k in set(current) & set(locked) if current[k] != locked[k])
+          print("ADDED:", added)
+          print("REMOVED:", removed)
+          print("CHANGED:", changed)
+          assert not added, f"Unexpected packages added: {added}"
+          assert not removed, f"Unexpected packages removed: {removed}"
+          allowed = {("networkx", "3.6.1", "3.4.2")}
+          assert set(changed) <= allowed, f"Unrelated dependency changes detected: {changed}"
+          assert current.get("networkx") == "3.6.1" and locked.get("networkx") == "3.4.2"
+          assert current.get("multidict") == "6.9.1" and locked.get("multidict") == "6.9.1"
+          print("MINIMAL-POLICY-DIFF=PASS")
+          PY
+      - name: Publish constrained authoritative lock candidate
         uses: actions/upload-artifact@v4
         with:
-          name: authoritative-requirements-lock
+          name: authoritative-requirements-lock-constrained
           path: /tmp/requirements.lock
           if-no-files-found: error
   auth:
